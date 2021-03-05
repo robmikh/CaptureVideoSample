@@ -133,7 +133,7 @@ void MainWindow::CreateControls(HINSTANCE instance)
     m_bitRateComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
     controls.CreateControl(util::ControlType::Label, L"Output fps:");
     m_fpsComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
-    m_topMostCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Make this window topmost");
+    m_topMostCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Make this window top-most");
     m_excludeCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Exclude this window");
     if (!isWin32CaptureExcludePresent)
     {
