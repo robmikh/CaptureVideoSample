@@ -95,6 +95,12 @@ LRESULT MainWindow::MessageHandler(UINT const message, WPARAM const wparam, LPAR
                     StopRecording();
                 }
             }
+            else if (hwnd == m_topMostCheckBox)
+            {
+                auto value = SendMessageW(m_topMostCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+                auto flag = value ? HWND_TOPMOST : HWND_NOTOPMOST;
+                winrt::check_bool(SetWindowPos(m_window, flag, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE));
+            }
             else if (hwnd == m_excludeCheckBox)
             {
                 auto value = SendMessageW(m_excludeCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED;
@@ -127,6 +133,7 @@ void MainWindow::CreateControls(HINSTANCE instance)
     m_bitRateComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
     controls.CreateControl(util::ControlType::Label, L"Output fps:");
     m_fpsComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
+    m_topMostCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Make this window topmost");
     m_excludeCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Exclude this window");
     if (!isWin32CaptureExcludePresent)
     {

@@ -52,6 +52,7 @@ private:
 	HWND m_resolutionComboBox = nullptr;
 	HWND m_bitRateComboBox = nullptr;
 	HWND m_fpsComboBox = nullptr;
+	HWND m_topMostCheckBox = nullptr;
 	HWND m_excludeCheckBox = nullptr;
 	std::vector<ResolutionEntry> m_resolutions;
 	std::vector<BitRateEntry> m_bitRates;
