@@ -81,23 +81,6 @@ LRESULT MainWindow::MessageHandler(UINT const message, WPARAM const wparam, LPAR
         auto hwnd = (HWND)lparam;
         switch (command)
         {
-        case CBN_SELCHANGE:
-        {
-            auto index = SendMessageW(hwnd, CB_GETCURSEL, 0, 0);
-            if (hwnd == m_resolutionComboBox)
-            {
-
-            }
-            else if (hwnd == m_bitRateComboBox)
-            {
-
-            }
-            else if (hwnd == m_fpsComboBox)
-            {
-
-            }
-        }
-        break;
         case BN_CLICKED:
         {
             if (hwnd == m_mainButton)

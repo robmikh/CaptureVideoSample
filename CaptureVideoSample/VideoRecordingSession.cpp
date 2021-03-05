@@ -140,7 +140,7 @@ void VideoRecordingSession::CloseInternal()
 }
 
 void VideoRecordingSession::OnMediaStreamSourceStarting(
-    winrt::MediaStreamSource const& sender, 
+    winrt::MediaStreamSource const&, 
     winrt::MediaStreamSourceStartingEventArgs const& args)
 {
     auto frame = *m_frameWait->TryGetNextFrame();
@@ -148,7 +148,7 @@ void VideoRecordingSession::OnMediaStreamSourceStarting(
 }
 
 void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
-    winrt::MediaStreamSource const& sender, 
+    winrt::MediaStreamSource const&, 
     winrt::MediaStreamSourceSampleRequestedEventArgs const& args)
 {
     auto request = args.Request();

@@ -56,7 +56,7 @@ std::optional<CaptureFrame> CaptureFrameWait::TryGetNextFrame()
     m_nextFrameEvent.ResetEvent();
 
     std::vector<HANDLE> events = { m_endEvent.get(), m_nextFrameEvent.get() };
-    auto waitResult = WaitForMultipleObjectsEx(events.size(), events.data(), false, INFINITE, false);
+    auto waitResult = WaitForMultipleObjectsEx(static_cast<DWORD>(events.size()), events.data(), false, INFINITE, false);
     auto eventIndex = -1;
     switch (waitResult)
     {
