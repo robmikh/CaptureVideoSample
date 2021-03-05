@@ -7,6 +7,7 @@ const std::wstring MainWindow::ClassName = L"CaptureVideoSample.MainWindow";
 
 namespace winrt
 {
+    using namespace Windows::Foundation::Metadata;
     using namespace Windows::Graphics;
     using namespace Windows::Graphics::Capture;
     using namespace Windows::Storage::Pickers;
@@ -94,6 +95,11 @@ LRESULT MainWindow::MessageHandler(UINT const message, WPARAM const wparam, LPAR
                     StopRecording();
                 }
             }
+            else if (hwnd == m_excludeCheckBox)
+            {
+                auto value = SendMessageW(m_excludeCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+                winrt::check_bool(SetWindowDisplayAffinity(m_window, value ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE));
+            }
         }
         break;
         }
@@ -109,6 +115,9 @@ LRESULT MainWindow::MessageHandler(UINT const message, WPARAM const wparam, LPAR
 
 void MainWindow::CreateControls(HINSTANCE instance)
 {
+    // Window exclusion
+    auto isWin32CaptureExcludePresent = winrt::ApiInformation::IsApiContractPresent(L"Windows.Foundation.UniversalApiContract", 9);
+
     auto controls = util::StackPanel(m_window, instance, 10, 10, 40, 200, 30);
 
     m_mainButton = controls.CreateControl(util::ControlType::Button, L"Select Window/Monitor");
@@ -118,6 +127,11 @@ void MainWindow::CreateControls(HINSTANCE instance)
     m_bitRateComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
     controls.CreateControl(util::ControlType::Label, L"Output fps:");
     m_fpsComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
+    m_excludeCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Exclude this window");
+    if (!isWin32CaptureExcludePresent)
+    {
+        EnableWindow(m_excludeCheckBox, false);
+    }
 
     // Populate resolution combo box
     for (auto& entry : m_resolutions)

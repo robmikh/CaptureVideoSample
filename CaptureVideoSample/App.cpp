@@ -85,5 +85,6 @@ void App::StopRecording()
     {
         m_recordingSession->Close();
         m_brush.Surface(nullptr);
+        m_recordingSession = nullptr;
     }
 }
