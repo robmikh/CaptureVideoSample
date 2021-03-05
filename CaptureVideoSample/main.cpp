@@ -8,8 +8,11 @@ namespace winrt
 {
     using namespace Windows::Foundation;
     using namespace Windows::Foundation::Numerics;
+    using namespace Windows::Foundation::Metadata;
     using namespace Windows::UI;
     using namespace Windows::UI::Composition;
+    using namespace Windows::Graphics::Capture;
+    using namespace Windows::Media::Core;
 }
 
 namespace util
@@ -21,6 +24,18 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, PSTR, int)
 {
     // Initialize COM
     winrt::init_apartment();
+
+    // Check to see that we have the minimum required features
+    auto isCaptureSupported = winrt::GraphicsCaptureSession::IsSupported();
+    auto sampleSupported = winrt::ApiInformation::IsMethodPresent(winrt::name_of<winrt::MediaStreamSample>(), L"CreateFromDirect3D11Surface");
+    if (!isCaptureSupported || !sampleSupported)
+    {
+        MessageBoxW(nullptr,
+            L"This release of Windows does not have the minimum required features! Please update to a newer release.",
+            L"CaptureVideoSample",
+            MB_OK | MB_ICONERROR);
+        return 1;
+    }
     
     // Register our window classes
     MainWindow::RegisterWindowClass();
