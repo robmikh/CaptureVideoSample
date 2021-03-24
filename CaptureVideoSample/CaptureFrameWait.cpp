@@ -1,7 +1,5 @@
 #include "pch.h"
 #include "CaptureFrameWait.h"
-#include "pch.h"
-#include "CaptureFrameWait.h"
 
 namespace winrt
 {
