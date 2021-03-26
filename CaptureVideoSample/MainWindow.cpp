@@ -64,9 +64,9 @@ MainWindow::MainWindow(std::wstring const& titleString, int width, int height, s
     };
     m_frameRates =
     {
-        { L"24 Mbps", 24 },
-        { L"30 Mbps", 30 },
-        { L"60 Mbps", 60 },
+        { L"24 fps", 24 },
+        { L"30 fps", 30 },
+        { L"60 fps", 60 },
     };
 
     CreateControls(instance);
