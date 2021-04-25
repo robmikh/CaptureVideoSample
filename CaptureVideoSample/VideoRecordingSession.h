@@ -33,7 +33,8 @@ private:
     winrt::com_ptr<ID3D11DeviceContext> m_d3dContext;
 
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_item{ nullptr };
-    std::unique_ptr<CaptureFrameWait> m_frameWait;
+    winrt::Windows::Graphics::Capture::GraphicsCaptureItem::Closed_revoker m_itemClosed;
+    std::shared_ptr<CaptureFrameWait> m_frameWait;
 
     winrt::Windows::Storage::Streams::IRandomAccessStream m_stream{ nullptr };
     winrt::Windows::Media::MediaProperties::MediaEncodingProfile m_encodingProfile{ nullptr };

@@ -48,7 +48,17 @@ VideoRecordingSession::VideoRecordingSession(
     m_d3dDevice->GetImmediateContext(m_d3dContext.put());
 
     m_item = item;
-    m_frameWait = std::make_unique<CaptureFrameWait>(m_device, m_item);
+    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item);
+    auto weakPointer{ std::weak_ptr{ m_frameWait } };
+    m_itemClosed = item.Closed(winrt::auto_revoke, [weakPointer](auto&, auto&)
+    {
+        auto sharedPointer{ weakPointer.lock() };
+
+        if (sharedPointer)
+        {
+            sharedPointer->StopCapture();
+        }
+    });
 
     auto width = EnsureEven(resolution.Width);
     auto height = EnsureEven(resolution.Height);
@@ -137,6 +147,7 @@ void VideoRecordingSession::Close()
 void VideoRecordingSession::CloseInternal()
 {
     m_frameWait->StopCapture();
+    m_itemClosed.revoke();
 }
 
 void VideoRecordingSession::OnMediaStreamSourceStarting(
@@ -188,6 +199,11 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
                 frameTexture.get(),
                 0,
                 &region);
+
+            // CopyResource can fail if our new texture isn't the same size as the back buffer
+            // TODO: Fix how resolutions are handled
+            desc = {};
+            backBuffer->GetDesc(&desc);
 
             desc.Usage = D3D11_USAGE_DEFAULT;
             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
