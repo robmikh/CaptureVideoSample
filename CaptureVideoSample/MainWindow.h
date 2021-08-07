@@ -2,6 +2,7 @@
 #include <robmikh.common/DesktopWindow.h>
 
 class App;
+class VideoEncoder;
 
 struct MainWindow : robmikh::common::desktop::DesktopWindow<MainWindow>
 {
@@ -15,6 +16,12 @@ private:
 	{
 		Idle,
 		Recording,
+	};
+
+	struct EncoderEntry
+	{
+		std::wstring Display;
+		std::shared_ptr<VideoEncoder> Encoder;
 	};
 
 	struct ResolutionEntry
@@ -49,11 +56,13 @@ private:
 	std::shared_ptr<App> m_app;
 	ApplicationState m_state = ApplicationState::Idle;
 	HWND m_mainButton = nullptr;
+	HWND m_encoderComboBox = nullptr;
 	HWND m_resolutionComboBox = nullptr;
 	HWND m_bitRateComboBox = nullptr;
 	HWND m_fpsComboBox = nullptr;
 	HWND m_topMostCheckBox = nullptr;
 	HWND m_excludeCheckBox = nullptr;
+	std::vector<EncoderEntry> m_encoders;
 	std::vector<ResolutionEntry> m_resolutions;
 	std::vector<BitRateEntry> m_bitRates;
 	std::vector<FrameRateEntry> m_frameRates;

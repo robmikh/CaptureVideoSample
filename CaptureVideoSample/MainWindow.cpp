@@ -2,6 +2,7 @@
 #include "MainWindow.h"
 #include "App.h"
 #include <robmikh.common/ControlsHelper.h>
+#include "VideoEncoder.h"
 
 const std::wstring MainWindow::ClassName = L"CaptureVideoSample.MainWindow";
 
@@ -47,6 +48,11 @@ MainWindow::MainWindow(std::wstring const& titleString, int width, int height, s
     UpdateWindow(m_window);
 
     m_app = app;
+    auto encoders = VideoEncoder::EnumerateAll();
+    for (auto& encoder : encoders)
+    {
+        m_encoders.push_back({ encoder->Name(), encoder });
+    }
     m_resolutions =
     {
         { L"1280 x 720", { 1280, 720 } },
@@ -127,6 +133,8 @@ void MainWindow::CreateControls(HINSTANCE instance)
     auto controls = util::StackPanel(m_window, instance, 10, 10, 40, 200, 30);
 
     m_mainButton = controls.CreateControl(util::ControlType::Button, L"Select Window/Monitor");
+    controls.CreateControl(util::ControlType::Label, L"Video encoder:");
+    m_encoderComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
     controls.CreateControl(util::ControlType::Label, L"Output resolution:");
     m_resolutionComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
     controls.CreateControl(util::ControlType::Label, L"Output bit rate:");
@@ -139,6 +147,13 @@ void MainWindow::CreateControls(HINSTANCE instance)
     {
         EnableWindow(m_excludeCheckBox, false);
     }
+
+    // Populate encoders combo box
+    for (auto& entry : m_encoders)
+    {
+        SendMessageW(m_encoderComboBox, CB_ADDSTRING, 0, (LPARAM)entry.Display.c_str());
+    }
+    //SendMessageW(m_encoderComboBox, CB_SETCURSEL, m_encoders.size() - 1, 0);
 
     // Populate resolution combo box
     for (auto& entry : m_resolutions)

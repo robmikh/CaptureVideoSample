@@ -11,6 +11,7 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="VideoRecordingSession.cpp" />
     <ClCompile Include="CaptureFrameWait.cpp" />
+    <ClCompile Include="VideoEncoder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -18,5 +19,6 @@
     <ClInclude Include="App.h" />
     <ClInclude Include="VideoRecordingSession.h" />
     <ClInclude Include="CaptureFrameWait.h" />
+    <ClInclude Include="VideoEncoder.h" />
   </ItemGroup>
 </Project>

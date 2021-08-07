@@ -29,12 +29,20 @@
 
 // WIL
 #include <wil/resource.h>
+#include <wil/com.h>
 
 // DirectX
 #include <d3d11_4.h>
 #include <dxgi1_6.h>
 #include <d2d1_3.h>
 #include <wincodec.h>
+
+// Media Foundation
+#include <mfidl.h>
+#include <mfapi.h>
+#include <mfreadwrite.h>
+#include <mferror.h>
+#include <wmcodecdsp.h>
 
 // STL
 #include <vector>
