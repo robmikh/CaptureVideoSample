@@ -50,6 +50,7 @@ App::~App()
 
 winrt::IAsyncOperation<winrt::StorageFile> App::StartRecordingAsync(
     winrt::GraphicsCaptureItem const& item,
+    winrt::com_ptr<IMFTransform> const& transform,
     winrt::SizeInt32 const& resolution,
     uint32_t bitRate,
     uint32_t frameRate)
@@ -65,6 +66,7 @@ winrt::IAsyncOperation<winrt::StorageFile> App::StartRecordingAsync(
         m_recordingSession = std::make_unique<VideoRecordingSession>(
             m_device,
             item,
+            transform,
             resolution,
             bitRate,
             frameRate, 

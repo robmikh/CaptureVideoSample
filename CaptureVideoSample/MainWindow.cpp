@@ -153,7 +153,7 @@ void MainWindow::CreateControls(HINSTANCE instance)
     {
         SendMessageW(m_encoderComboBox, CB_ADDSTRING, 0, (LPARAM)entry.Display.c_str());
     }
-    //SendMessageW(m_encoderComboBox, CB_SETCURSEL, m_encoders.size() - 1, 0);
+    SendMessageW(m_encoderComboBox, CB_SETCURSEL, 0, 0);
 
     // Populate resolution combo box
     for (auto& entry : m_resolutions)
@@ -195,10 +195,11 @@ winrt::fire_and_forget MainWindow::StartRecording()
         auto resolution = GetResolution(item);
         auto bitRate = GetBitRate();
         auto frameRate = GetFrameRate();
+        auto encoder = GetEncoder();
 
         OnRecordingStarted();
 
-        auto file = co_await m_app->StartRecordingAsync(item, resolution, bitRate, frameRate);
+        auto file = co_await m_app->StartRecordingAsync(item, encoder->Transform(), resolution, bitRate, frameRate);
 
         auto filePicker = winrt::FileSavePicker();
         InitializeObjectWithWindowHandle(filePicker);
@@ -225,6 +226,7 @@ winrt::fire_and_forget MainWindow::StartRecording()
 void MainWindow::OnRecordingStarted()
 {
     winrt::check_bool(SetWindowTextW(m_mainButton, L"Stop Recording"));
+    EnableWindow(m_encoderComboBox, false);
     EnableWindow(m_resolutionComboBox, false);
     EnableWindow(m_bitRateComboBox, false);
     EnableWindow(m_fpsComboBox, false);
@@ -234,6 +236,7 @@ void MainWindow::OnRecordingStarted()
 void MainWindow::OnRecordingFinished()
 {
     winrt::check_bool(SetWindowTextW(m_mainButton, L"Select Window\\Monitor"));
+    EnableWindow(m_encoderComboBox, true);
     EnableWindow(m_resolutionComboBox, true);
     EnableWindow(m_bitRateComboBox, true);
     EnableWindow(m_fpsComboBox, true);
@@ -266,6 +269,13 @@ uint32_t MainWindow::GetFrameRate()
     auto index = GetIndexFromComboBox(m_fpsComboBox);
     auto& entry = m_frameRates[index];
     return entry.FrameRate;
+}
+
+std::shared_ptr<VideoEncoder> MainWindow::GetEncoder()
+{
+    auto index = GetIndexFromComboBox(m_encoderComboBox);
+    auto& entry = m_encoders[index];
+    return entry.Encoder;
 }
 
 void MainWindow::StopRecording()

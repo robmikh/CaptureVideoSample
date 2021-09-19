@@ -10,6 +10,7 @@ public:
 
     winrt::Windows::Foundation::IAsyncOperation<winrt::Windows::Storage::StorageFile> StartRecordingAsync(
         winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& item,
+        winrt::com_ptr<IMFTransform> const& transform,
         winrt::Windows::Graphics::SizeInt32 const& resolution,
         uint32_t bitRate,
         uint32_t frameRate);

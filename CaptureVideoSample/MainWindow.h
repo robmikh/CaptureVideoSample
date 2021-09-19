@@ -50,6 +50,7 @@ private:
 	winrt::Windows::Graphics::SizeInt32 GetResolution(winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& source);
 	uint32_t GetBitRate();
 	uint32_t GetFrameRate();
+	std::shared_ptr<VideoEncoder> GetEncoder();
 	void StopRecording();
 
 private:

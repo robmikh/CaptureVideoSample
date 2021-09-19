@@ -10,6 +10,7 @@ namespace winrt
     using namespace Windows::Graphics::DirectX;
     using namespace Windows::Graphics::DirectX::Direct3D11;
     using namespace Windows::Storage;
+    using namespace Windows::Storage::Streams;
     using namespace Windows::UI::Composition;
     using namespace Windows::Media::Core;
     using namespace Windows::Media::Transcoding;
@@ -37,7 +38,8 @@ int32_t EnsureEven(int32_t value)
 
 VideoRecordingSession::VideoRecordingSession(
     winrt::IDirect3DDevice const& device, 
-    winrt::GraphicsCaptureItem const& item, 
+    winrt::GraphicsCaptureItem const& item,
+    winrt::com_ptr<IMFTransform> const& transform,
     winrt::SizeInt32 const& resolution, 
     uint32_t bitRate, 
     uint32_t frameRate, 
@@ -46,6 +48,7 @@ VideoRecordingSession::VideoRecordingSession(
     m_device = device;
     m_d3dDevice = GetDXGIInterfaceFromObject<ID3D11Device>(m_device);
     m_d3dDevice->GetImmediateContext(m_d3dContext.put());
+    //m_transform = transform;
 
     m_item = item;
     m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item);
