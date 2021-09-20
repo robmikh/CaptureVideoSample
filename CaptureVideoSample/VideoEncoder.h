@@ -19,7 +19,8 @@ public:
     VideoEncoder(
         std::shared_ptr<VideoEncoderDevice> const& encoderDevice, 
         winrt::com_ptr<ID3D11Device> const& d3dDevice,
-        winrt::Windows::Graphics::SizeInt32 const& resolution,
+        winrt::Windows::Graphics::SizeInt32 const& inputResolution,
+        winrt::Windows::Graphics::SizeInt32 const& outputResolution,
         uint32_t bitRate,
         uint32_t frameRate);
 

@@ -60,6 +60,9 @@ VideoRecordingSession::VideoRecordingSession(
     m_videoDevice = m_d3dDevice.as<ID3D11VideoDevice>();
     m_videoContext = m_d3dContext.as<ID3D11VideoContext>();
 
+    // We use the input size here for both input/output in the video processor
+    // because it will stretch the image instead of maintaing the aspect ratio.
+    // The scaling will happen through the encoder (if supported).
     winrt::com_ptr<ID3D11VideoProcessorEnumerator> videoEnum;
     D3D11_VIDEO_PROCESSOR_CONTENT_DESC videoDesc = {};
     videoDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
@@ -69,8 +72,8 @@ VideoRecordingSession::VideoRecordingSession(
     videoDesc.InputHeight = inputHeight;
     videoDesc.OutputFrameRate.Numerator = 60;
     videoDesc.OutputFrameRate.Denominator = 1;
-    videoDesc.OutputWidth = outputWidth;
-    videoDesc.OutputHeight = outputHeight;
+    videoDesc.OutputWidth = inputWidth;
+    videoDesc.OutputHeight = inputHeight;
     videoDesc.Usage = D3D11_VIDEO_USAGE_OPTIMAL_QUALITY;
     winrt::check_hresult(m_videoDevice->CreateVideoProcessorEnumerator(&videoDesc, videoEnum.put()));
 
@@ -84,8 +87,8 @@ VideoRecordingSession::VideoRecordingSession(
     m_videoContext->VideoProcessorSetStreamColorSpace(m_videoProcessor.get(), 0, &colorSpace);
 
     D3D11_TEXTURE2D_DESC textureDesc = {};
-    textureDesc.Width = outputWidth;
-    textureDesc.Height = outputHeight;
+    textureDesc.Width = inputWidth;
+    textureDesc.Height = inputHeight;
     textureDesc.ArraySize = 1;
     textureDesc.MipLevels = 1;
     textureDesc.Format = DXGI_FORMAT_NV12;
@@ -113,7 +116,8 @@ VideoRecordingSession::VideoRecordingSession(
     // Create VideoEncoder
     m_videoEncoder = std::make_shared<VideoEncoder>(
         encoderDevice, 
-        m_d3dDevice, 
+        m_d3dDevice,
+        winrt::SizeInt32{ inputWidth, inputHeight },
         winrt::SizeInt32{ outputWidth, outputHeight }, 
         bitRate, 
         frameRate);

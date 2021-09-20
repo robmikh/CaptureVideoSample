@@ -11,7 +11,8 @@ namespace winrt
 VideoEncoder::VideoEncoder(
     std::shared_ptr<VideoEncoderDevice> const& encoderDevice, 
     winrt::com_ptr<ID3D11Device> const& d3dDevice,
-    winrt::SizeInt32 const& resolution,
+    winrt::SizeInt32 const& inputResolution,
+    winrt::SizeInt32 const& outputResolution,
     uint32_t bitRate,
     uint32_t frameRate)
 {
@@ -70,7 +71,7 @@ VideoEncoder::VideoEncoder(
     winrt::check_hresult(outputType->SetGUID(MF_MT_MAJOR_TYPE, info.guidMajorType));
     winrt::check_hresult(outputType->SetGUID(MF_MT_SUBTYPE, info.guidSubtype));
     winrt::check_hresult(outputType->SetUINT32(MF_MT_AVG_BITRATE, bitRate));
-    winrt::check_hresult(MFSetAttributeSize(outputType.get(), MF_MT_FRAME_SIZE, resolution.Width, resolution.Height));
+    winrt::check_hresult(MFSetAttributeSize(outputType.get(), MF_MT_FRAME_SIZE, outputResolution.Width, outputResolution.Height));
     winrt::check_hresult(MFSetAttributeRatio(outputType.get(), MF_MT_FRAME_RATE, frameRate, 1));
     winrt::check_hresult(MFSetAttributeRatio(outputType.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1));
     winrt::check_hresult(outputType->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive));
@@ -92,7 +93,7 @@ VideoEncoder::VideoEncoder(
             winrt::check_hresult(hr);
             winrt::check_hresult(inputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video));
             winrt::check_hresult(inputType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12));
-            winrt::check_hresult(MFSetAttributeSize(inputType.get(), MF_MT_FRAME_SIZE, resolution.Width, resolution.Height));
+            winrt::check_hresult(MFSetAttributeSize(inputType.get(), MF_MT_FRAME_SIZE, inputResolution.Width, inputResolution.Height));
             winrt::check_hresult(MFSetAttributeRatio(inputType.get(), MF_MT_FRAME_RATE, 60, 1));
             hr = m_transform->SetInputType(m_inputStreamId, inputType.get(), MFT_SET_TYPE_TEST_ONLY);
             if (hr == MF_E_INVALIDMEDIATYPE)
