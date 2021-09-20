@@ -76,6 +76,13 @@ VideoRecordingSession::VideoRecordingSession(
 
     winrt::check_hresult(m_videoDevice->CreateVideoProcessor(videoEnum.get(), 0, m_videoProcessor.put()));
 
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE colorSpace = {};
+    colorSpace.Usage = 1; // Video processing
+    colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
+    m_videoContext->VideoProcessorSetOutputColorSpace(m_videoProcessor.get(), &colorSpace);
+    colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
+    m_videoContext->VideoProcessorSetStreamColorSpace(m_videoProcessor.get(), 0, &colorSpace);
+
     D3D11_TEXTURE2D_DESC textureDesc = {};
     textureDesc.Width = outputWidth;
     textureDesc.Height = outputHeight;
