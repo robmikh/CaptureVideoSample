@@ -5,6 +5,7 @@
 namespace winrt
 {
     using namespace Windows::Foundation;
+    using namespace Windows::Foundation::Numerics;
     using namespace Windows::Graphics;
     using namespace Windows::Graphics::Capture;
     using namespace Windows::Graphics::DirectX;
@@ -36,6 +37,47 @@ int32_t EnsureEven(int32_t value)
     }
 }
 
+float ComputeScaleFactor(winrt::float2 const outputSize, winrt::float2 const inputSize)
+{
+    auto outputRatio = outputSize.x / outputSize.y;
+    auto inputRatio = inputSize.x / inputSize.y;
+
+    auto scaleFactor = outputSize.x / inputSize.x;
+    if (outputRatio > inputRatio)
+    {
+        scaleFactor = outputSize.y / inputSize.y;
+    }
+
+    return scaleFactor;
+}
+
+winrt::RectInt32 ComputeDestRect(winrt::SizeInt32 const outputSize, winrt::SizeInt32 const inputSize)
+{
+    auto scale = ComputeScaleFactor({ (float)outputSize.Width, (float)outputSize.Height }, { (float)inputSize.Width, (float)inputSize.Height });
+    winrt::SizeInt32 newSize{ inputSize.Width * scale, inputSize.Height * scale };
+    auto offsetX = 0;
+    auto offsetY = 0;
+    if (newSize.Width != outputSize.Width)
+    {
+        offsetX = (outputSize.Width - newSize.Width) / 2;
+    }
+    if (newSize.Height != outputSize.Height)
+    {
+        offsetY = (outputSize.Height - newSize.Height) / 2;
+    }
+    return winrt::RectInt32{
+        offsetX,
+        offsetY,
+        newSize.Width,
+        newSize.Height
+    };
+}
+
+winrt::SizeInt32 EnsureEvenSize(winrt::SizeInt32 const size)
+{
+    return winrt::SizeInt32{ EnsureEven(size.Width), EnsureEven(size.Height) };
+}
+
 VideoRecordingSession::VideoRecordingSession(
     winrt::IDirect3DDevice const& device, 
     winrt::GraphicsCaptureItem const& item,
@@ -51,29 +93,24 @@ VideoRecordingSession::VideoRecordingSession(
 
     m_item = item;
     auto itemSize = item.Size();
-    auto inputWidth = EnsureEven(itemSize.Width);
-    auto inputHeight = EnsureEven(itemSize.Height);
-    auto outputWidth = EnsureEven(resolution.Width);
-    auto outputHeight = EnsureEven(resolution.Height);
+    auto inputSize = EnsureEvenSize(itemSize);
+    auto outputSize = EnsureEvenSize(resolution);
 
     // Setup video conversion
     m_videoDevice = m_d3dDevice.as<ID3D11VideoDevice>();
     m_videoContext = m_d3dContext.as<ID3D11VideoContext>();
 
-    // We use the input size here for both input/output in the video processor
-    // because it will stretch the image instead of maintaing the aspect ratio.
-    // The scaling will happen through the encoder (if supported).
     winrt::com_ptr<ID3D11VideoProcessorEnumerator> videoEnum;
     D3D11_VIDEO_PROCESSOR_CONTENT_DESC videoDesc = {};
     videoDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
     videoDesc.InputFrameRate.Numerator = 60;
     videoDesc.InputFrameRate.Denominator = 1;
-    videoDesc.InputWidth = inputWidth;
-    videoDesc.InputHeight = inputHeight;
+    videoDesc.InputWidth = inputSize.Width;
+    videoDesc.InputHeight = inputSize.Height;
     videoDesc.OutputFrameRate.Numerator = 60;
     videoDesc.OutputFrameRate.Denominator = 1;
-    videoDesc.OutputWidth = inputWidth;
-    videoDesc.OutputHeight = inputHeight;
+    videoDesc.OutputWidth = outputSize.Width;
+    videoDesc.OutputHeight = outputSize.Height;
     videoDesc.Usage = D3D11_VIDEO_USAGE_OPTIMAL_QUALITY;
     winrt::check_hresult(m_videoDevice->CreateVideoProcessorEnumerator(&videoDesc, videoEnum.put()));
 
@@ -86,9 +123,23 @@ VideoRecordingSession::VideoRecordingSession(
     colorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
     m_videoContext->VideoProcessorSetStreamColorSpace(m_videoProcessor.get(), 0, &colorSpace);
 
+    // If the input and output resolutions don't match, setup the
+    // video processor to preserve the aspect ratio when scaling.
+    if (inputSize.Width != outputSize.Width || inputSize.Height != outputSize.Height)
+    {
+        auto destRect = ComputeDestRect(outputSize, inputSize);
+        auto rect = RECT{
+            destRect.X,
+            destRect.Y,
+            destRect.X + destRect.Width,
+            destRect.Y + destRect.Height,
+        };
+        m_videoContext->VideoProcessorSetStreamDestRect(m_videoProcessor.get(), 0, true, &rect);
+    }
+
     D3D11_TEXTURE2D_DESC textureDesc = {};
-    textureDesc.Width = inputWidth;
-    textureDesc.Height = inputHeight;
+    textureDesc.Width = outputSize.Width;
+    textureDesc.Height = outputSize.Height;
     textureDesc.ArraySize = 1;
     textureDesc.MipLevels = 1;
     textureDesc.Format = DXGI_FORMAT_NV12;
@@ -102,8 +153,8 @@ VideoRecordingSession::VideoRecordingSession(
     outputViewDesc.Texture2D.MipSlice = 0;
     winrt::check_hresult(m_videoDevice->CreateVideoProcessorOutputView(m_videoOutputTexture.get(), videoEnum.get(), &outputViewDesc, m_videoOutput.put()));
 
-    textureDesc.Width = inputWidth;
-    textureDesc.Height = inputHeight;
+    textureDesc.Width = inputSize.Width;
+    textureDesc.Height = inputSize.Height;
     textureDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
     winrt::check_hresult(m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, m_videoInputTexture.put()));
@@ -117,15 +168,15 @@ VideoRecordingSession::VideoRecordingSession(
     m_videoEncoder = std::make_shared<VideoEncoder>(
         encoderDevice, 
         m_d3dDevice,
-        winrt::SizeInt32{ inputWidth, inputHeight },
-        winrt::SizeInt32{ outputWidth, outputHeight }, 
+        outputSize, // We're scaling in the video processor
+        outputSize,
         bitRate, 
         frameRate);
     m_videoEncoder->SetSampleRequestedCallback(std::bind(&VideoRecordingSession::OnSampleRequested, this));
     m_videoEncoder->SetSampleRenderedCallback(std::bind(&VideoRecordingSession::OnSampleRendered, this, std::placeholders::_1));
 
     // Setup capture
-    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item, winrt::SizeInt32{ inputWidth, inputHeight });
+    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item, inputSize);
     auto weakPointer{ std::weak_ptr{ m_frameWait } };
     m_itemClosed = item.Closed(winrt::auto_revoke, [weakPointer](auto&, auto&)
     {
@@ -150,8 +201,8 @@ VideoRecordingSession::VideoRecordingSession(
     // Setup preview
     m_previewSwapChain = util::CreateDXGISwapChain(
         m_d3dDevice, 
-        static_cast<uint32_t>(inputWidth),
-        static_cast<uint32_t>(inputHeight),
+        static_cast<uint32_t>(inputSize.Width),
+        static_cast<uint32_t>(inputSize.Height),
         DXGI_FORMAT_B8G8R8A8_UNORM, 
         2);
     winrt::com_ptr<ID3D11Texture2D> backBuffer;
