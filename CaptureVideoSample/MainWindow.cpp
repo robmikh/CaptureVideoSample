@@ -2,7 +2,7 @@
 #include "MainWindow.h"
 #include "App.h"
 #include <robmikh.common/ControlsHelper.h>
-#include "VideoEncoder.h"
+#include "VideoEncoderDevice.h"
 
 const std::wstring MainWindow::ClassName = L"CaptureVideoSample.MainWindow";
 
@@ -48,10 +48,10 @@ MainWindow::MainWindow(std::wstring const& titleString, int width, int height, s
     UpdateWindow(m_window);
 
     m_app = app;
-    auto encoders = VideoEncoder::EnumerateAll();
-    for (auto& encoder : encoders)
+    auto encoderDevices = VideoEncoderDevice::EnumerateAll();
+    for (auto& encoderDevice : encoderDevices)
     {
-        m_encoders.push_back({ encoder->Name(), encoder });
+        m_encoderDevices.push_back({ encoderDevice->Name(), encoderDevice });
     }
     m_resolutions =
     {
@@ -134,7 +134,7 @@ void MainWindow::CreateControls(HINSTANCE instance)
 
     m_mainButton = controls.CreateControl(util::ControlType::Button, L"Select Window/Monitor");
     controls.CreateControl(util::ControlType::Label, L"Video encoder:");
-    m_encoderComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
+    m_encoderDeviceComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
     controls.CreateControl(util::ControlType::Label, L"Output resolution:");
     m_resolutionComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
     controls.CreateControl(util::ControlType::Label, L"Output bit rate:");
@@ -149,11 +149,11 @@ void MainWindow::CreateControls(HINSTANCE instance)
     }
 
     // Populate encoders combo box
-    for (auto& entry : m_encoders)
+    for (auto& entry : m_encoderDevices)
     {
-        SendMessageW(m_encoderComboBox, CB_ADDSTRING, 0, (LPARAM)entry.Display.c_str());
+        SendMessageW(m_encoderDeviceComboBox, CB_ADDSTRING, 0, (LPARAM)entry.Display.c_str());
     }
-    SendMessageW(m_encoderComboBox, CB_SETCURSEL, 0, 0);
+    SendMessageW(m_encoderDeviceComboBox, CB_SETCURSEL, 0, 0);
 
     // Populate resolution combo box
     for (auto& entry : m_resolutions)
@@ -195,11 +195,11 @@ winrt::fire_and_forget MainWindow::StartRecording()
         auto resolution = GetResolution(item);
         auto bitRate = GetBitRate();
         auto frameRate = GetFrameRate();
-        auto encoder = GetEncoder();
+        auto encoderDevice = GetEncoderDevice();
 
         OnRecordingStarted();
 
-        auto file = co_await m_app->StartRecordingAsync(item, encoder->Transform(), resolution, bitRate, frameRate);
+        auto file = co_await m_app->StartRecordingAsync(item, encoderDevice, resolution, bitRate, frameRate);
 
         auto filePicker = winrt::FileSavePicker();
         InitializeObjectWithWindowHandle(filePicker);
@@ -226,7 +226,7 @@ winrt::fire_and_forget MainWindow::StartRecording()
 void MainWindow::OnRecordingStarted()
 {
     winrt::check_bool(SetWindowTextW(m_mainButton, L"Stop Recording"));
-    EnableWindow(m_encoderComboBox, false);
+    EnableWindow(m_encoderDeviceComboBox, false);
     EnableWindow(m_resolutionComboBox, false);
     EnableWindow(m_bitRateComboBox, false);
     EnableWindow(m_fpsComboBox, false);
@@ -236,7 +236,7 @@ void MainWindow::OnRecordingStarted()
 void MainWindow::OnRecordingFinished()
 {
     winrt::check_bool(SetWindowTextW(m_mainButton, L"Select Window\\Monitor"));
-    EnableWindow(m_encoderComboBox, true);
+    EnableWindow(m_encoderDeviceComboBox, true);
     EnableWindow(m_resolutionComboBox, true);
     EnableWindow(m_bitRateComboBox, true);
     EnableWindow(m_fpsComboBox, true);
@@ -271,11 +271,11 @@ uint32_t MainWindow::GetFrameRate()
     return entry.FrameRate;
 }
 
-std::shared_ptr<VideoEncoder> MainWindow::GetEncoder()
+std::shared_ptr<VideoEncoderDevice> MainWindow::GetEncoderDevice()
 {
-    auto index = GetIndexFromComboBox(m_encoderComboBox);
-    auto& entry = m_encoders[index];
-    return entry.Encoder;
+    auto index = GetIndexFromComboBox(m_encoderDeviceComboBox);
+    auto& entry = m_encoderDevices[index];
+    return entry.EncoderDevice;
 }
 
 void MainWindow::StopRecording()

@@ -2,7 +2,7 @@
 #include <robmikh.common/DesktopWindow.h>
 
 class App;
-class VideoEncoder;
+class VideoEncoderDevice;
 
 struct MainWindow : robmikh::common::desktop::DesktopWindow<MainWindow>
 {
@@ -18,10 +18,10 @@ private:
 		Recording,
 	};
 
-	struct EncoderEntry
+	struct EncoderDeviceEntry
 	{
 		std::wstring Display;
-		std::shared_ptr<VideoEncoder> Encoder;
+		std::shared_ptr<VideoEncoderDevice> EncoderDevice;
 	};
 
 	struct ResolutionEntry
@@ -50,20 +50,20 @@ private:
 	winrt::Windows::Graphics::SizeInt32 GetResolution(winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& source);
 	uint32_t GetBitRate();
 	uint32_t GetFrameRate();
-	std::shared_ptr<VideoEncoder> GetEncoder();
+	std::shared_ptr<VideoEncoderDevice> GetEncoderDevice();
 	void StopRecording();
 
 private:
 	std::shared_ptr<App> m_app;
 	ApplicationState m_state = ApplicationState::Idle;
 	HWND m_mainButton = nullptr;
-	HWND m_encoderComboBox = nullptr;
+	HWND m_encoderDeviceComboBox = nullptr;
 	HWND m_resolutionComboBox = nullptr;
 	HWND m_bitRateComboBox = nullptr;
 	HWND m_fpsComboBox = nullptr;
 	HWND m_topMostCheckBox = nullptr;
 	HWND m_excludeCheckBox = nullptr;
-	std::vector<EncoderEntry> m_encoders;
+	std::vector<EncoderDeviceEntry> m_encoderDevices;
 	std::vector<ResolutionEntry> m_resolutions;
 	std::vector<BitRateEntry> m_bitRates;
 	std::vector<FrameRateEntry> m_frameRates;

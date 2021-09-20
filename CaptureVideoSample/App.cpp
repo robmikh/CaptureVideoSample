@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "App.h"
 #include "VideoRecordingSession.h"
+#include "VideoEncoderDevice.h"
 
 namespace winrt
 {
@@ -39,7 +40,12 @@ App::App(winrt::ContainerVisual const& root)
     m_content.Shadow(shadow);
     m_root.Children().InsertAtTop(m_content);
 
-    auto d3dDevice = util::CreateD3DDevice();
+    auto flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
+#ifdef _DEBUG
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+    auto d3dDevice = util::CreateD3DDevice(flags);
     auto dxgiDevice = d3dDevice.as<IDXGIDevice>();
     m_device = CreateDirect3DDevice(dxgiDevice.get());
 }
@@ -50,7 +56,7 @@ App::~App()
 
 winrt::IAsyncOperation<winrt::StorageFile> App::StartRecordingAsync(
     winrt::GraphicsCaptureItem const& item,
-    winrt::com_ptr<IMFTransform> const& transform,
+    std::shared_ptr<VideoEncoderDevice> const& encoderDevice,
     winrt::SizeInt32 const& resolution,
     uint32_t bitRate,
     uint32_t frameRate)
@@ -66,7 +72,7 @@ winrt::IAsyncOperation<winrt::StorageFile> App::StartRecordingAsync(
         m_recordingSession = std::make_unique<VideoRecordingSession>(
             m_device,
             item,
-            transform,
+            encoderDevice,
             resolution,
             bitRate,
             frameRate, 

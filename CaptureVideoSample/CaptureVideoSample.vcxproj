@@ -144,14 +144,17 @@
     <ClCompile Include="MainWindow.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="VideoEncoder.cpp" />
+    <ClCompile Include="VideoEncoderDevice.cpp" />
     <ClCompile Include="VideoRecordingSession.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
     <ClInclude Include="CaptureFrameWait.h" />
     <ClInclude Include="MainWindow.h" />
+    <ClInclude Include="MediaBufferGuard.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="VideoEncoder.h" />
+    <ClInclude Include="VideoEncoderDevice.h" />
     <ClInclude Include="VideoRecordingSession.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

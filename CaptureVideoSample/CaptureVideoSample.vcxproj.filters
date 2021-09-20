@@ -12,6 +12,7 @@
     <ClCompile Include="VideoRecordingSession.cpp" />
     <ClCompile Include="CaptureFrameWait.cpp" />
     <ClCompile Include="VideoEncoder.cpp" />
+    <ClCompile Include="VideoEncoderDevice.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -20,5 +21,7 @@
     <ClInclude Include="VideoRecordingSession.h" />
     <ClInclude Include="CaptureFrameWait.h" />
     <ClInclude Include="VideoEncoder.h" />
+    <ClInclude Include="VideoEncoderDevice.h" />
+    <ClInclude Include="MediaBufferGuard.h" />
   </ItemGroup>
 </Project>

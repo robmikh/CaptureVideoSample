@@ -51,6 +51,11 @@
 #include <memory>
 #include <algorithm>
 #include <filesystem>
+#include <array>
+#include <thread>
+#include <functional>
+#include <optional>
+#include <chrono>
 
 // robmikh.common
 #include <robmikh.common/composition.interop.h>
@@ -63,3 +68,6 @@
 #include <robmikh.common/hwnd.interop.h>
 #include <robmikh.common/capture.desktop.interop.h>
 #include <robmikh.common/DesktopWindow.h>
+
+// Helpers
+#include "MediaBufferGuard.h"

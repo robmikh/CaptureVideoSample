@@ -39,7 +39,7 @@ int32_t EnsureEven(int32_t value)
 VideoRecordingSession::VideoRecordingSession(
     winrt::IDirect3DDevice const& device, 
     winrt::GraphicsCaptureItem const& item,
-    winrt::com_ptr<IMFTransform> const& transform,
+    std::shared_ptr<VideoEncoderDevice> const& encoderDevice,
     winrt::SizeInt32 const& resolution, 
     uint32_t bitRate, 
     uint32_t frameRate, 
@@ -48,9 +48,75 @@ VideoRecordingSession::VideoRecordingSession(
     m_device = device;
     m_d3dDevice = GetDXGIInterfaceFromObject<ID3D11Device>(m_device);
     m_d3dDevice->GetImmediateContext(m_d3dContext.put());
-    //m_transform = transform;
 
     m_item = item;
+    auto itemSize = item.Size();
+    auto inputWidth = itemSize.Width;
+    auto inputHeight = itemSize.Height;
+    auto outputWidth = EnsureEven(resolution.Width);
+    auto outputHeight = EnsureEven(resolution.Height);
+
+    // TODO: Fix sizing
+    WINRT_VERIFY(inputWidth == outputWidth);
+    WINRT_VERIFY(inputHeight == outputHeight);
+
+    // Setup video conversion
+    m_videoDevice = m_d3dDevice.as<ID3D11VideoDevice>();
+    m_videoContext = m_d3dContext.as<ID3D11VideoContext>();
+
+    winrt::com_ptr<ID3D11VideoProcessorEnumerator> videoEnum;
+    D3D11_VIDEO_PROCESSOR_CONTENT_DESC videoDesc = {};
+    videoDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
+    videoDesc.InputFrameRate.Numerator = 60;
+    videoDesc.InputFrameRate.Denominator = 1;
+    videoDesc.InputWidth = outputWidth;
+    videoDesc.InputHeight = outputHeight;
+    videoDesc.OutputFrameRate.Numerator = 60;
+    videoDesc.OutputFrameRate.Denominator = 1;
+    videoDesc.OutputWidth = itemSize.Width;
+    videoDesc.OutputHeight = itemSize.Height;
+    videoDesc.Usage = D3D11_VIDEO_USAGE_OPTIMAL_QUALITY;
+    winrt::check_hresult(m_videoDevice->CreateVideoProcessorEnumerator(&videoDesc, videoEnum.put()));
+
+    winrt::check_hresult(m_videoDevice->CreateVideoProcessor(videoEnum.get(), 0, m_videoProcessor.put()));
+
+    D3D11_TEXTURE2D_DESC textureDesc = {};
+    textureDesc.Width = outputWidth;
+    textureDesc.Height = outputHeight;
+    textureDesc.ArraySize = 1;
+    textureDesc.MipLevels = 1;
+    textureDesc.Format = DXGI_FORMAT_NV12;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.Usage = D3D11_USAGE_DEFAULT;
+    textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_VIDEO_ENCODER;
+    winrt::check_hresult(m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, m_videoOutputTexture.put()));
+
+    D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC outputViewDesc = {};
+    outputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+    outputViewDesc.Texture2D.MipSlice = 0;
+    winrt::check_hresult(m_videoDevice->CreateVideoProcessorOutputView(m_videoOutputTexture.get(), videoEnum.get(), &outputViewDesc, m_videoOutput.put()));
+
+    textureDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    winrt::check_hresult(m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, m_videoInputTexture.put()));
+
+    D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC inputViewDesc = {};
+    inputViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+    inputViewDesc.Texture2D.MipSlice = 0;
+    // The output of the scene renderer is the input to the video conversion
+    winrt::check_hresult(m_videoDevice->CreateVideoProcessorInputView(m_videoInputTexture.get(), videoEnum.get(), &inputViewDesc, m_videoInput.put()));
+
+    // Create VideoEncoder
+    m_videoEncoder = std::make_shared<VideoEncoder>(
+        encoderDevice, 
+        m_d3dDevice, 
+        winrt::SizeInt32{ outputWidth, outputHeight }, 
+        bitRate, 
+        frameRate);
+    m_videoEncoder->SetSampleRequestedCallback(std::bind(&VideoRecordingSession::OnSampleRequested, this));
+    m_videoEncoder->SetSampleRenderedCallback(std::bind(&VideoRecordingSession::OnSampleRendered, this, std::placeholders::_1));
+
+    // Setup capture
     m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item);
     auto weakPointer{ std::weak_ptr{ m_frameWait } };
     m_itemClosed = item.Closed(winrt::auto_revoke, [weakPointer](auto&, auto&)
@@ -63,28 +129,21 @@ VideoRecordingSession::VideoRecordingSession(
         }
     });
 
-    auto width = EnsureEven(resolution.Width);
-    auto height = EnsureEven(resolution.Height);
-
-    m_encodingProfile = winrt::MediaEncodingProfile();
-    m_encodingProfile.Container().Subtype(L"MPEG4");
-    auto video = m_encodingProfile.Video();
-    video.Subtype(L"H264");
-    video.Width(width);
-    video.Height(height);
-    video.Bitrate(bitRate);
-    video.FrameRate().Numerator(frameRate);
-    video.FrameRate().Denominator(1);
-    video.PixelAspectRatio().Numerator(1);
-    video.PixelAspectRatio().Denominator(1);
-    m_encodingProfile.Video(video);
-
+    // Setup MFSinkWriter
     m_stream = stream;
+    winrt::com_ptr<IMFByteStream> byteStream;
+    winrt::check_hresult(MFCreateMFByteStreamOnStreamEx(stream.as<::IUnknown>().get(), byteStream.put()));
+    winrt::check_hresult(MFCreateSinkWriterFromURL(L".mp4", byteStream.get(), nullptr, m_sinkWriter.put()));
+    winrt::check_hresult(m_sinkWriter->AddStream(m_videoEncoder->OutputType().get(), &m_sinkWriterStreamIndex));
+    winrt::check_hresult(m_sinkWriter->SetInputMediaType(m_sinkWriterStreamIndex, m_videoEncoder->OutputType().get(), nullptr));
+    winrt::TimeSpan frameDuration = std::chrono::milliseconds((int)((1.0 / (float)frameRate) * 1000.0));
+    m_frameDuration = frameDuration.count();
 
+    // Setup preview
     m_previewSwapChain = util::CreateDXGISwapChain(
         m_d3dDevice, 
-        static_cast<uint32_t>(width),
-        static_cast<uint32_t>(height),
+        static_cast<uint32_t>(outputWidth),
+        static_cast<uint32_t>(outputHeight),
         DXGI_FORMAT_B8G8R8A8_UNORM, 
         2);
     winrt::com_ptr<ID3D11Texture2D> backBuffer;
@@ -102,30 +161,10 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
     auto expected = false;
     if (m_isRecording.compare_exchange_strong(expected, true))
     {
-        auto itemSize = m_item.Size();
-        auto width = itemSize.Width;
-        auto height = itemSize.Height;
-
-        // Describe our input: uncompressed BGRA8 buffers
-        auto properties = winrt::VideoEncodingProperties::CreateUncompressed(
-            winrt::MediaEncodingSubtypes::Bgra8(),
-            static_cast<uint32_t>(width),
-            static_cast<uint32_t>(height));
-        m_videoDescriptor = winrt::VideoStreamDescriptor(properties);
-
-        // Create our MediaStreamSource
-        m_streamSource = winrt::MediaStreamSource(m_videoDescriptor);
-        m_streamSource.BufferTime(std::chrono::seconds(0));
-        m_streamSource.Starting({ this, &VideoRecordingSession::OnMediaStreamSourceStarting });
-        m_streamSource.SampleRequested({ this, &VideoRecordingSession::OnMediaStreamSourceSampleRequested });
-
-        // Create our transcoder
-        m_transcoder = winrt::MediaTranscoder();
-        m_transcoder.HardwareAccelerationEnabled(true);
-
-        // Start encoding
-        auto transcode = co_await m_transcoder.PrepareMediaStreamSourceTranscodeAsync(m_streamSource, m_stream, m_encodingProfile);
-        co_await transcode.TranscodeAsync();
+        auto sinkWriter = m_sinkWriter;
+        winrt::check_hresult(sinkWriter->BeginWriting());
+        co_await m_videoEncoder->StartAsync();
+        winrt::check_hresult(sinkWriter->Finalize());
     }
     co_return;
 }
@@ -237,6 +276,122 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
         request.Sample(nullptr);
         CloseInternal();
     }
+}
+
+std::optional<std::unique_ptr<InputSample>> VideoRecordingSession::OnSampleRequested()
+{
+    if (auto frame = m_frameWait->TryGetNextFrame())
+    {
+        try
+        {
+            if (!m_seenFirstTimeStamp)
+            {
+                m_firstTimeStamp = frame->SystemRelativeTime;
+                m_seenFirstTimeStamp = true;
+            }
+            auto timeStamp = frame->SystemRelativeTime - m_firstTimeStamp;
+            auto contentSize = frame->ContentSize;
+            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->FrameTexture);
+            D3D11_TEXTURE2D_DESC desc = {};
+            frameTexture->GetDesc(&desc);
+
+            // TODO: Update preview
+            winrt::com_ptr<ID3D11Texture2D> backBuffer;
+            winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
+
+            // In order to support window resizing, we need to only copy out the part of
+            // the buffer that contains the window. If the window is smaller than the buffer,
+            // then it's a straight forward copy using the ContentSize. If the window is larger,
+            // we need to clamp to the size of the buffer. For simplicity, we always clamp.
+            auto width = std::clamp(contentSize.Width, 0, static_cast<int32_t>(desc.Width));
+            auto height = std::clamp(contentSize.Height, 0, static_cast<int32_t>(desc.Height));
+
+            D3D11_BOX region = {};
+            region.left = 0;
+            region.right = width;
+            region.top = 0;
+            region.bottom = height;
+            region.back = 1;
+
+            m_d3dContext->ClearRenderTargetView(m_renderTargetView.get(), CLEARCOLOR);
+            m_d3dContext->CopySubresourceRegion(
+                backBuffer.get(),
+                0,
+                0, 0, 0,
+                frameTexture.get(),
+                0,
+                &region);
+
+            // TODO: Actually use the scene renderer (if required)
+            // Copy the back buffer to the scene output texture
+            m_d3dContext->CopyResource(m_videoInputTexture.get(), backBuffer.get());
+
+            // Present the preview
+            DXGI_PRESENT_PARAMETERS presentParameters{};
+            winrt::check_hresult(m_previewSwapChain->Present1(0, 0, &presentParameters));
+
+            // Conver to NV12
+            D3D11_VIDEO_PROCESSOR_STREAM videoStream = {};
+            videoStream.Enable = true;
+            videoStream.OutputIndex = 0;
+            videoStream.InputFrameOrField = 0;
+            videoStream.pInputSurface = m_videoInput.get();
+            winrt::check_hresult(m_videoContext->VideoProcessorBlt(m_videoProcessor.get(), m_videoOutput.get(), 0, 1, &videoStream));
+
+            // Make a copy for the sample
+            desc = {};
+            m_videoOutputTexture->GetDesc(&desc);
+            winrt::com_ptr<ID3D11Texture2D> sampleTexture;
+            winrt::check_hresult(m_d3dDevice->CreateTexture2D(&desc, nullptr, sampleTexture.put()));
+            m_d3dContext->CopyResource(sampleTexture.get(), m_videoOutputTexture.get());
+
+            auto sample = std::make_unique<InputSample>(std::move(InputSample{ timeStamp, sampleTexture }));
+            return std::optional<std::unique_ptr<InputSample>>{ std::move(sample) };
+        }
+        catch (winrt::hresult_error const& error)
+        {
+            OutputDebugStringW(error.message().c_str());
+            CloseInternal();
+            return std::nullopt;
+        }
+    }
+    else
+    {
+        CloseInternal();
+        return std::nullopt;
+    }
+}
+
+void VideoRecordingSession::OnSampleRendered(std::unique_ptr<OutputSample> sample)
+{
+    // TODO: avoid this copy
+    // Create a new memory buffer.
+    winrt::com_ptr<IMFMediaBuffer> buffer;
+    winrt::check_hresult(MFCreateMemoryBuffer(sample->Bytes.size(), buffer.put()));
+    winrt::check_hresult(buffer->SetCurrentLength(sample->Bytes.size()));
+
+    // Lock the buffer and copy the video frame to the buffer.
+    {
+        auto guard = MediaBufferGuard(buffer);
+        auto info = guard.Info();
+
+        WINRT_VERIFY(memcpy_s(reinterpret_cast<void*>(info.Bits), info.CurrentLength, reinterpret_cast<void*>(sample->Bytes.data()), sample->Bytes.size()) == 0);
+    }
+    
+    // Set the data length of the buffer.
+    winrt::check_hresult(buffer->SetCurrentLength(sample->Bytes.size()));
+
+    // Create a media sample and add the buffer to the sample.
+    winrt::com_ptr<IMFSample> mfSample;
+    winrt::check_hresult(MFCreateSample(mfSample.put()));
+    winrt::check_hresult(mfSample->AddBuffer(buffer.get()));
+
+    // Set the time stamp and the duration.
+    winrt::check_hresult(mfSample->SetSampleTime(sample->TimeStamp));
+    winrt::check_hresult(mfSample->SetSampleDuration(m_frameDuration));
+
+    // Send the sample to the Sink Writer.
+    winrt::check_hresult(m_sinkWriter->WriteSample(m_sinkWriterStreamIndex, mfSample.get()));
 }
 
 winrt::ICompositionSurface VideoRecordingSession::CreatePreviewSurface(winrt::Compositor const& compositor)

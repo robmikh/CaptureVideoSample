@@ -25,6 +25,9 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, PSTR, int)
     // Initialize COM
     winrt::init_apartment();
 
+    // Initialize Media Foundation
+    winrt::check_hresult(MFStartup(MF_VERSION));
+
     // Check to see that we have the minimum required features
     auto isCaptureSupported = winrt::GraphicsCaptureSession::IsSupported();
     auto sampleSupported = winrt::ApiInformation::IsMethodPresent(winrt::name_of<winrt::MediaStreamSample>(), L"CreateFromDirect3D11Surface");
