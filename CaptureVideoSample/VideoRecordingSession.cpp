@@ -192,92 +192,6 @@ void VideoRecordingSession::CloseInternal()
     m_itemClosed.revoke();
 }
 
-void VideoRecordingSession::OnMediaStreamSourceStarting(
-    winrt::MediaStreamSource const&, 
-    winrt::MediaStreamSourceStartingEventArgs const& args)
-{
-    auto frame = *m_frameWait->TryGetNextFrame();
-    args.Request().SetActualStartPosition(frame.SystemRelativeTime);
-}
-
-void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
-    winrt::MediaStreamSource const&, 
-    winrt::MediaStreamSourceSampleRequestedEventArgs const& args)
-{
-    auto request = args.Request();
-    if (auto frame = m_frameWait->TryGetNextFrame())
-    {
-        try
-        {
-            auto timeStamp = frame->SystemRelativeTime;
-            auto contentSize = frame->ContentSize;
-            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->FrameTexture);
-            D3D11_TEXTURE2D_DESC desc = {};
-            frameTexture->GetDesc(&desc);
-
-            // TODO: Update preview
-            winrt::com_ptr<ID3D11Texture2D> backBuffer;
-            winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
-
-            // In order to support window resizing, we need to only copy out the part of
-            // the buffer that contains the window. If the window is smaller than the buffer,
-            // then it's a straight forward copy using the ContentSize. If the window is larger,
-            // we need to clamp to the size of the buffer. For simplicity, we always clamp.
-            auto width = std::clamp(contentSize.Width, 0, static_cast<int32_t>(desc.Width));
-            auto height = std::clamp(contentSize.Height, 0, static_cast<int32_t>(desc.Height));
-
-            D3D11_BOX region = {};
-            region.left = 0;
-            region.right = width;
-            region.top = 0;
-            region.bottom = height;
-            region.back = 1;
-
-            m_d3dContext->ClearRenderTargetView(m_renderTargetView.get(), CLEARCOLOR);
-            m_d3dContext->CopySubresourceRegion(
-                backBuffer.get(),
-                0,
-                0, 0, 0,
-                frameTexture.get(),
-                0,
-                &region);
-
-            // CopyResource can fail if our new texture isn't the same size as the back buffer
-            // TODO: Fix how resolutions are handled
-            desc = {};
-            backBuffer->GetDesc(&desc);
-
-            desc.Usage = D3D11_USAGE_DEFAULT;
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-            desc.CPUAccessFlags = 0;
-            desc.MiscFlags = 0;
-            winrt::com_ptr<ID3D11Texture2D> sampleTexture;
-            winrt::check_hresult(m_d3dDevice->CreateTexture2D(&desc, nullptr, sampleTexture.put()));
-            m_d3dContext->CopyResource(sampleTexture.get(), backBuffer.get());
-            auto dxgiSurface = sampleTexture.as<IDXGISurface>();
-            auto sampleSurface = CreateDirect3DSurface(dxgiSurface.get());
-
-            DXGI_PRESENT_PARAMETERS presentParameters{};
-            winrt::check_hresult(m_previewSwapChain->Present1(0, 0, &presentParameters));
-
-            auto sample = winrt::MediaStreamSample::CreateFromDirect3D11Surface(sampleSurface, timeStamp);
-            request.Sample(sample);
-        }
-        catch (winrt::hresult_error const& error)
-        {
-            OutputDebugStringW(error.message().c_str());
-            request.Sample(nullptr);
-            CloseInternal();
-            return;
-        }
-    }
-    else
-    {
-        request.Sample(nullptr);
-        CloseInternal();
-    }
-}
-
 std::optional<std::unique_ptr<InputSample>> VideoRecordingSession::OnSampleRequested()
 {
     if (auto frame = m_frameWait->TryGetNextFrame())
@@ -295,7 +209,6 @@ std::optional<std::unique_ptr<InputSample>> VideoRecordingSession::OnSampleReque
             D3D11_TEXTURE2D_DESC desc = {};
             frameTexture->GetDesc(&desc);
 
-            // TODO: Update preview
             winrt::com_ptr<ID3D11Texture2D> backBuffer;
             winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
 
@@ -322,15 +235,14 @@ std::optional<std::unique_ptr<InputSample>> VideoRecordingSession::OnSampleReque
                 0,
                 &region);
 
-            // TODO: Actually use the scene renderer (if required)
-            // Copy the back buffer to the scene output texture
+            // Copy the back buffer to the video input texture
             m_d3dContext->CopyResource(m_videoInputTexture.get(), backBuffer.get());
 
             // Present the preview
             DXGI_PRESENT_PARAMETERS presentParameters{};
             winrt::check_hresult(m_previewSwapChain->Present1(0, 0, &presentParameters));
 
-            // Conver to NV12
+            // Convert to NV12
             D3D11_VIDEO_PROCESSOR_STREAM videoStream = {};
             videoStream.Enable = true;
             videoStream.OutputIndex = 0;

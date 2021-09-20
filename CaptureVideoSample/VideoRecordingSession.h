@@ -23,13 +23,6 @@ public:
 private:
     void CloseInternal();
 
-    void OnMediaStreamSourceStarting(
-        winrt::Windows::Media::Core::MediaStreamSource const& sender,
-        winrt::Windows::Media::Core::MediaStreamSourceStartingEventArgs const& args);
-    void OnMediaStreamSourceSampleRequested(
-        winrt::Windows::Media::Core::MediaStreamSource const& sender,
-        winrt::Windows::Media::Core::MediaStreamSourceSampleRequestedEventArgs const& args);
-
     std::optional<std::unique_ptr<InputSample>> OnSampleRequested();
     void OnSampleRendered(std::unique_ptr<OutputSample> sample);
 
