@@ -43,5 +43,5 @@ jobs:
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: 'Win32CaptureSample_${{ matrix.platform }}_${{ matrix.configuration }}'
+        name: 'CaptureVideoSample_${{ matrix.platform }}_${{ matrix.configuration }}'
         path: '.\${{ matrix.platform }}\${{ matrix.configuration }}\*'
