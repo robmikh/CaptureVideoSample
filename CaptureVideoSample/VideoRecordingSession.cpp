@@ -51,14 +51,10 @@ VideoRecordingSession::VideoRecordingSession(
 
     m_item = item;
     auto itemSize = item.Size();
-    auto inputWidth = itemSize.Width;
-    auto inputHeight = itemSize.Height;
+    auto inputWidth = EnsureEven(itemSize.Width);
+    auto inputHeight = EnsureEven(itemSize.Height);
     auto outputWidth = EnsureEven(resolution.Width);
     auto outputHeight = EnsureEven(resolution.Height);
-
-    // TODO: Fix sizing
-    WINRT_VERIFY(inputWidth == outputWidth);
-    WINRT_VERIFY(inputHeight == outputHeight);
 
     // Setup video conversion
     m_videoDevice = m_d3dDevice.as<ID3D11VideoDevice>();
@@ -69,12 +65,12 @@ VideoRecordingSession::VideoRecordingSession(
     videoDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
     videoDesc.InputFrameRate.Numerator = 60;
     videoDesc.InputFrameRate.Denominator = 1;
-    videoDesc.InputWidth = outputWidth;
-    videoDesc.InputHeight = outputHeight;
+    videoDesc.InputWidth = inputWidth;
+    videoDesc.InputHeight = inputHeight;
     videoDesc.OutputFrameRate.Numerator = 60;
     videoDesc.OutputFrameRate.Denominator = 1;
-    videoDesc.OutputWidth = itemSize.Width;
-    videoDesc.OutputHeight = itemSize.Height;
+    videoDesc.OutputWidth = outputWidth;
+    videoDesc.OutputHeight = outputHeight;
     videoDesc.Usage = D3D11_VIDEO_USAGE_OPTIMAL_QUALITY;
     winrt::check_hresult(m_videoDevice->CreateVideoProcessorEnumerator(&videoDesc, videoEnum.put()));
 
@@ -96,6 +92,8 @@ VideoRecordingSession::VideoRecordingSession(
     outputViewDesc.Texture2D.MipSlice = 0;
     winrt::check_hresult(m_videoDevice->CreateVideoProcessorOutputView(m_videoOutputTexture.get(), videoEnum.get(), &outputViewDesc, m_videoOutput.put()));
 
+    textureDesc.Width = inputWidth;
+    textureDesc.Height = inputHeight;
     textureDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
     winrt::check_hresult(m_d3dDevice->CreateTexture2D(&textureDesc, nullptr, m_videoInputTexture.put()));
@@ -117,7 +115,7 @@ VideoRecordingSession::VideoRecordingSession(
     m_videoEncoder->SetSampleRenderedCallback(std::bind(&VideoRecordingSession::OnSampleRendered, this, std::placeholders::_1));
 
     // Setup capture
-    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item);
+    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item, winrt::SizeInt32{ inputWidth, inputHeight });
     auto weakPointer{ std::weak_ptr{ m_frameWait } };
     m_itemClosed = item.Closed(winrt::auto_revoke, [weakPointer](auto&, auto&)
     {
@@ -142,8 +140,8 @@ VideoRecordingSession::VideoRecordingSession(
     // Setup preview
     m_previewSwapChain = util::CreateDXGISwapChain(
         m_d3dDevice, 
-        static_cast<uint32_t>(outputWidth),
-        static_cast<uint32_t>(outputHeight),
+        static_cast<uint32_t>(inputWidth),
+        static_cast<uint32_t>(inputHeight),
         DXGI_FORMAT_B8G8R8A8_UNORM, 
         2);
     winrt::com_ptr<ID3D11Texture2D> backBuffer;
