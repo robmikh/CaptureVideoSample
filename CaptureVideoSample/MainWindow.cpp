@@ -212,13 +212,13 @@ winrt::fire_and_forget MainWindow::StartRecording()
         if (destFile == nullptr)
         {
             co_await file.DeleteAsync();
-            co_return;
         }
-
-        co_await file.MoveAndReplaceAsync(destFile);
-
+        else
+        {
+            co_await file.MoveAndReplaceAsync(destFile);
+            co_await winrt::Launcher::LaunchFileAsync(destFile);
+        }
         OnRecordingFinished();
-        co_await winrt::Launcher::LaunchFileAsync(destFile);
     }
     co_return;
 }
