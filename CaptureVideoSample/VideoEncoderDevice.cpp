@@ -7,8 +7,8 @@ inline std::wstring GetStringAttribute(winrt::com_ptr<IMFAttributes> const& attr
     {
         uint32_t resultLength = 0;
         winrt::check_hresult(attributes->GetStringLength(attributeGuid, &resultLength));
-        std::wstring result(L' ', resultLength);
-        winrt::check_hresult(attributes->GetString(attributeGuid, result.data(), result.size(), &resultLength));
+        std::wstring result((size_t)resultLength + 1, L' ');
+        winrt::check_hresult(attributes->GetString(attributeGuid, result.data(), (uint32_t)result.size(), &resultLength));
         result.resize(resultLength);
         return result;
     }

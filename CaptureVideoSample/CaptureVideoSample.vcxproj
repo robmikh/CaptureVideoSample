@@ -145,6 +145,7 @@
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="VideoEncoder.cpp" />
     <ClCompile Include="VideoEncoderDevice.cpp" />
+    <ClCompile Include="VideoProcessor.cpp" />
     <ClCompile Include="VideoRecordingSession.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -155,6 +156,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="VideoEncoder.h" />
     <ClInclude Include="VideoEncoderDevice.h" />
+    <ClInclude Include="VideoProcessor.h" />
     <ClInclude Include="VideoRecordingSession.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
