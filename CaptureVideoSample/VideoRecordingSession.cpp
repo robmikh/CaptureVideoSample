@@ -364,33 +364,7 @@ std::optional<std::unique_ptr<InputSample>> VideoRecordingSession::OnSampleReque
 
 void VideoRecordingSession::OnSampleRendered(std::unique_ptr<OutputSample> sample)
 {
-    // TODO: avoid this copy
-    // Create a new memory buffer.
-    winrt::com_ptr<IMFMediaBuffer> buffer;
-    winrt::check_hresult(MFCreateMemoryBuffer(sample->Bytes.size(), buffer.put()));
-    winrt::check_hresult(buffer->SetCurrentLength(sample->Bytes.size()));
-
-    // Lock the buffer and copy the video frame to the buffer.
-    {
-        auto guard = MediaBufferGuard(buffer);
-        auto info = guard.Info();
-
-        WINRT_VERIFY(memcpy_s(reinterpret_cast<void*>(info.Bits), info.CurrentLength, reinterpret_cast<void*>(sample->Bytes.data()), sample->Bytes.size()) == 0);
-    }
-    
-    // Set the data length of the buffer.
-    winrt::check_hresult(buffer->SetCurrentLength(sample->Bytes.size()));
-
-    // Create a media sample and add the buffer to the sample.
-    winrt::com_ptr<IMFSample> mfSample;
-    winrt::check_hresult(MFCreateSample(mfSample.put()));
-    winrt::check_hresult(mfSample->AddBuffer(buffer.get()));
-
-    // Set the time stamp and the duration.
-    winrt::check_hresult(mfSample->SetSampleTime(sample->TimeStamp));
-    winrt::check_hresult(mfSample->SetSampleDuration(m_frameDuration));
-
-    // Send the sample to the Sink Writer.
+    auto mfSample = sample->MFSample;
     winrt::check_hresult(m_sinkWriter->WriteSample(m_sinkWriterStreamIndex, mfSample.get()));
 }
 

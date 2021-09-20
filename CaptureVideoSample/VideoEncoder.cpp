@@ -198,19 +198,6 @@ void VideoEncoder::OnTransformOutputReady()
     winrt::com_ptr<IMFCollection> events;
     events.attach(outputBuffer.pEvents);
 
-    int64_t sampleTime = 0;
-    winrt::check_hresult(sample->GetSampleTime(&sampleTime));
-
-    winrt::com_ptr<IMFMediaBuffer> buffer;
-    winrt::check_hresult(sample->ConvertToContiguousBuffer(buffer.put()));
-
-    {
-        auto guard = MediaBufferGuard(buffer);
-        auto info = guard.Info();
-
-        std::vector<byte> bytes(info.CurrentLength, 0);
-        WINRT_VERIFY(memcpy_s(reinterpret_cast<void*>(bytes.data()), bytes.size(), reinterpret_cast<void*>(info.Bits), info.CurrentLength) == 0);
-        auto outputSample = std::make_unique<OutputSample>(std::move(OutputSample{ sampleTime, std::move(bytes) }));
-        m_sampleRenderedCallback(std::move(outputSample));
-    }
+    auto outputSample = std::make_unique<OutputSample>(std::move(OutputSample{ sample }));
+    m_sampleRenderedCallback(std::move(outputSample));
 }

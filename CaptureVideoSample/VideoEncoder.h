@@ -10,8 +10,7 @@ struct InputSample
 
 struct OutputSample
 {
-    int64_t TimeStamp;
-    std::vector<byte> Bytes;
+    winrt::com_ptr<IMFSample> MFSample;
 };
 
 class VideoEncoder
