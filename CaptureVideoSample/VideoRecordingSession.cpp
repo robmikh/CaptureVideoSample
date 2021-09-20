@@ -161,6 +161,11 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
     auto expected = false;
     if (m_isRecording.compare_exchange_strong(expected, true))
     {
+        // We need to hold a reference to ourselves so that we have enough
+        // time to finish the encoding even when the caller drops their 
+        // last reference.
+        auto thisRef = shared_from_this();
+
         auto sinkWriter = m_sinkWriter;
         winrt::check_hresult(sinkWriter->BeginWriting());
         co_await m_videoEncoder->StartAsync();

@@ -69,7 +69,7 @@ winrt::IAsyncOperation<winrt::StorageFile> App::StartRecordingAsync(
 
     {
         auto stream = co_await file.OpenAsync(winrt::FileAccessMode::ReadWrite);
-        m_recordingSession = std::make_unique<VideoRecordingSession>(
+        m_recordingSession = std::make_shared<VideoRecordingSession>(
             m_device,
             item,
             encoderDevice,

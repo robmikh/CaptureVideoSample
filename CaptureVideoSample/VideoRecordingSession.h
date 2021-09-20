@@ -3,7 +3,7 @@
 #include "VideoEncoder.h"
 #include "VideoEncoderDevice.h"
 
-class VideoRecordingSession
+class VideoRecordingSession : public std::enable_shared_from_this<VideoRecordingSession>
 {
 public:
     VideoRecordingSession(

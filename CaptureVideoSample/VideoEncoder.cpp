@@ -35,7 +35,7 @@ VideoEncoder::VideoEncoder(
     std::vector<DWORD> inputStreamIds(numInputStreams, 0);
     std::vector<DWORD> outputSteamIds(numOutputStreams, 0);
     {
-        auto hr = m_transform->GetStreamIDs(inputStreamIds.size(), inputStreamIds.data(), outputSteamIds.size(), outputSteamIds.data());
+        auto hr = m_transform->GetStreamIDs(numInputStreams, inputStreamIds.data(), numOutputStreams, outputSteamIds.data());
         // https://docs.microsoft.com/en-us/windows/win32/api/mftransform/nf-mftransform-imftransform-getstreamids
         // This method can return E_NOTIMPL if both of the following conditions are true:
         //   * The transform has a fixed number of streams.
