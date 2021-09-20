@@ -48,7 +48,13 @@ VideoRecordingSession::VideoRecordingSession(
     m_d3dDevice->GetImmediateContext(m_d3dContext.put());
 
     m_item = item;
-    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item);
+    auto itemSize = item.Size();
+    auto inputWidth = EnsureEven(itemSize.Width);
+    auto inputHeight = EnsureEven(itemSize.Height);
+    auto outputWidth = EnsureEven(resolution.Width);
+    auto outputHeight = EnsureEven(resolution.Height);
+
+    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item, winrt::SizeInt32{ inputWidth, inputHeight });
     auto weakPointer{ std::weak_ptr{ m_frameWait } };
     m_itemClosed = item.Closed(winrt::auto_revoke, [weakPointer](auto&, auto&)
     {
@@ -60,15 +66,13 @@ VideoRecordingSession::VideoRecordingSession(
         }
     });
 
-    auto width = EnsureEven(resolution.Width);
-    auto height = EnsureEven(resolution.Height);
-
+    // Describe out output: H264 video with an MP4 container
     m_encodingProfile = winrt::MediaEncodingProfile();
     m_encodingProfile.Container().Subtype(L"MPEG4");
     auto video = m_encodingProfile.Video();
     video.Subtype(L"H264");
-    video.Width(width);
-    video.Height(height);
+    video.Width(outputWidth);
+    video.Height(outputHeight);
     video.Bitrate(bitRate);
     video.FrameRate().Numerator(frameRate);
     video.FrameRate().Denominator(1);
@@ -76,12 +80,19 @@ VideoRecordingSession::VideoRecordingSession(
     video.PixelAspectRatio().Denominator(1);
     m_encodingProfile.Video(video);
 
+    // Describe our input: uncompressed BGRA8 buffers
+    auto properties = winrt::VideoEncodingProperties::CreateUncompressed(
+        winrt::MediaEncodingSubtypes::Bgra8(),
+        static_cast<uint32_t>(inputWidth),
+        static_cast<uint32_t>(inputHeight));
+    m_videoDescriptor = winrt::VideoStreamDescriptor(properties);
+
     m_stream = stream;
 
     m_previewSwapChain = util::CreateDXGISwapChain(
         m_d3dDevice, 
-        static_cast<uint32_t>(width),
-        static_cast<uint32_t>(height),
+        static_cast<uint32_t>(inputWidth),
+        static_cast<uint32_t>(inputHeight),
         DXGI_FORMAT_B8G8R8A8_UNORM, 
         2);
     winrt::com_ptr<ID3D11Texture2D> backBuffer;
@@ -99,17 +110,6 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
     auto expected = false;
     if (m_isRecording.compare_exchange_strong(expected, true))
     {
-        auto itemSize = m_item.Size();
-        auto width = itemSize.Width;
-        auto height = itemSize.Height;
-
-        // Describe our input: uncompressed BGRA8 buffers
-        auto properties = winrt::VideoEncodingProperties::CreateUncompressed(
-            winrt::MediaEncodingSubtypes::Bgra8(),
-            static_cast<uint32_t>(width),
-            static_cast<uint32_t>(height));
-        m_videoDescriptor = winrt::VideoStreamDescriptor(properties);
-
         // Create our MediaStreamSource
         m_streamSource = winrt::MediaStreamSource(m_videoDescriptor);
         m_streamSource.BufferTime(std::chrono::seconds(0));

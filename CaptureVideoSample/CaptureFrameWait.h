@@ -12,7 +12,8 @@ class CaptureFrameWait
 public:
     CaptureFrameWait(
         winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice const& device,
-        winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& item);
+        winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& item,
+        winrt::Windows::Graphics::SizeInt32 const& size);
     ~CaptureFrameWait();
 
     std::optional<CaptureFrame> TryGetNextFrame();

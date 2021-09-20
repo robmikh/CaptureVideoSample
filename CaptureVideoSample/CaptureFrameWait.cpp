@@ -19,7 +19,8 @@ namespace util
 
 CaptureFrameWait::CaptureFrameWait(
     winrt::IDirect3DDevice const& device,
-    winrt::GraphicsCaptureItem const& item)
+    winrt::GraphicsCaptureItem const& item,
+    winrt::SizeInt32 const& size)
 {
     m_device = device;
     m_item = item;
@@ -32,7 +33,7 @@ CaptureFrameWait::CaptureFrameWait(
         m_device, 
         winrt::DirectXPixelFormat::B8G8R8A8UIntNormalized, 
         1,
-        m_item.Size());
+        size);
     m_session = m_framePool.CreateCaptureSession(m_item);
 
     m_framePool.FrameArrived({ this, &CaptureFrameWait::OnFrameArrived });
