@@ -1,5 +1,6 @@
 #pragma once
 #include "CaptureFrameWait.h"
+#include "Direct3D11SceneRenderer.h"
 
 class VideoRecordingSession
 {
@@ -31,6 +32,8 @@ private:
     winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice m_device{ nullptr };
     winrt::com_ptr<ID3D11Device> m_d3dDevice;
     winrt::com_ptr<ID3D11DeviceContext> m_d3dContext;
+
+    std::shared_ptr<Direct3D11SceneRenderer> m_sceneRenderer;
 
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_item{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem::Closed_revoker m_itemClosed;

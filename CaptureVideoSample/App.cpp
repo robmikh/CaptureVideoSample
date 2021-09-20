@@ -39,7 +39,12 @@ App::App(winrt::ContainerVisual const& root)
     m_content.Shadow(shadow);
     m_root.Children().InsertAtTop(m_content);
 
-    auto d3dDevice = util::CreateD3DDevice();
+    uint32_t flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+#ifdef _DEBUG
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+    auto d3dDevice = util::CreateD3DDevice(flags);
     auto dxgiDevice = d3dDevice.as<IDXGIDevice>();
     m_device = CreateDirect3DDevice(dxgiDevice.get());
 }

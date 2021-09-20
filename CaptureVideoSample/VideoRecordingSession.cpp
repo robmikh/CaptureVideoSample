@@ -47,6 +47,12 @@ VideoRecordingSession::VideoRecordingSession(
     m_d3dDevice = GetDXGIInterfaceFromObject<ID3D11Device>(m_device);
     m_d3dDevice->GetImmediateContext(m_d3dContext.put());
 
+    auto outputWidth = EnsureEven(resolution.Width);
+    auto outputHeight = EnsureEven(resolution.Height);
+
+    // TODO: We only need to use this if the user selected a resolution other than the source size.
+    m_sceneRenderer = std::make_shared<Direct3D11SceneRenderer>(m_d3dDevice, winrt::SizeInt32{ outputWidth, outputHeight });
+
     m_item = item;
     m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item);
     auto weakPointer{ std::weak_ptr{ m_frameWait } };
@@ -60,15 +66,12 @@ VideoRecordingSession::VideoRecordingSession(
         }
     });
 
-    auto width = EnsureEven(resolution.Width);
-    auto height = EnsureEven(resolution.Height);
-
     m_encodingProfile = winrt::MediaEncodingProfile();
     m_encodingProfile.Container().Subtype(L"MPEG4");
     auto video = m_encodingProfile.Video();
     video.Subtype(L"H264");
-    video.Width(width);
-    video.Height(height);
+    video.Width(outputWidth);
+    video.Height(outputHeight);
     video.Bitrate(bitRate);
     video.FrameRate().Numerator(frameRate);
     video.FrameRate().Denominator(1);
@@ -80,8 +83,8 @@ VideoRecordingSession::VideoRecordingSession(
 
     m_previewSwapChain = util::CreateDXGISwapChain(
         m_d3dDevice, 
-        static_cast<uint32_t>(width),
-        static_cast<uint32_t>(height),
+        static_cast<uint32_t>(outputWidth),
+        static_cast<uint32_t>(outputHeight),
         DXGI_FORMAT_B8G8R8A8_UNORM, 
         2);
     winrt::com_ptr<ID3D11Texture2D> backBuffer;

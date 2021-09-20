@@ -11,6 +11,7 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="VideoRecordingSession.cpp" />
     <ClCompile Include="CaptureFrameWait.cpp" />
+    <ClCompile Include="Direct3D11SceneRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -18,5 +19,20 @@
     <ClInclude Include="App.h" />
     <ClInclude Include="VideoRecordingSession.h" />
     <ClInclude Include="CaptureFrameWait.h" />
+    <ClInclude Include="Direct3D11SceneRenderer.h" />
+    <ClInclude Include="Shaders.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{bf51989b-d600-4a71-bff7-b22975d2d563}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="PixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="VertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
