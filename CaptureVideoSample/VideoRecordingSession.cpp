@@ -108,7 +108,6 @@ VideoRecordingSession::VideoRecordingSession(
     D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC inputViewDesc = {};
     inputViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
     inputViewDesc.Texture2D.MipSlice = 0;
-    // The output of the scene renderer is the input to the video conversion
     winrt::check_hresult(m_videoDevice->CreateVideoProcessorInputView(m_videoInputTexture.get(), videoEnum.get(), &inputViewDesc, m_videoInput.put()));
 
     // Create VideoEncoder
