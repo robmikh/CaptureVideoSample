@@ -104,7 +104,7 @@ VideoRecordingSession::VideoRecordingSession(
 
     // Setup preview
     m_previewSwapChain = util::CreateDXGISwapChain(
-        m_d3dDevice, 
+        m_d3dDevice,
         static_cast<uint32_t>(inputSize.Width),
         static_cast<uint32_t>(inputSize.Height),
         DXGI_FORMAT_B8G8R8A8_UNORM, 
