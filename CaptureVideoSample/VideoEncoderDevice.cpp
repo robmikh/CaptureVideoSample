@@ -1,25 +1,22 @@
 #include "pch.h"
 #include "VideoEncoderDevice.h"
 
-inline std::wstring GetStringAttribute(winrt::com_ptr<IMFAttributes> const& attributes, GUID const& attributeGuid)
+inline std::optional<std::wstring> GetStringAttribute(winrt::com_ptr<IMFAttributes> const& attributes, GUID const& attributeGuid)
 {
-    try
+    uint32_t resultLength = 0;
+    HRESULT hr = attributes->GetStringLength(attributeGuid, &resultLength);
+    if (SUCCEEDED(hr))
     {
-        uint32_t resultLength = 0;
-        winrt::check_hresult(attributes->GetStringLength(attributeGuid, &resultLength));
         std::wstring result((size_t)resultLength + 1, L' ');
         winrt::check_hresult(attributes->GetString(attributeGuid, result.data(), (uint32_t)result.size(), &resultLength));
         result.resize(resultLength);
-        return result;
+        return std::optional(std::move(result));
     }
-    catch (winrt::hresult_error const error)
+    else if (hr != MF_E_ATTRIBUTENOTFOUND)
     {
-        if (error.code() != MF_E_ATTRIBUTENOTFOUND)
-        {
-            throw error;
-        }
+        throw winrt::hresult_error(hr);
     }
-    return L"Unknown";
+    return std::nullopt;
 }
 
 inline auto EnumerateMFTs(GUID const& category, uint32_t const& flags, MFT_REGISTER_TYPE_INFO const* inputType, MFT_REGISTER_TYPE_INFO const* outputType)
@@ -71,16 +68,18 @@ std::vector<std::shared_ptr<VideoEncoderDevice>> VideoEncoderDevice::EnumerateAl
 
 VideoEncoderDevice::VideoEncoderDevice(winrt::com_ptr<IMFActivate> const& transformSource)
 {
-    // Activate the transform so we can get the friendly name
-    winrt::com_ptr<IMFTransform> transform;
-    winrt::check_hresult(transformSource->ActivateObject(winrt::guid_of<IMFTransform>(), transform.put_void()));
-
-    winrt::com_ptr<IMFAttributes> attributes;
-    winrt::check_hresult(transform->GetAttributes(attributes.put()));
-    auto name = GetStringAttribute(attributes, MFT_FRIENDLY_NAME_Attribute);
+    std::wstring friendlyName;
+    if (auto name = GetStringAttribute(transformSource, MFT_FRIENDLY_NAME_Attribute))
+    {
+        friendlyName = name.value();
+    }
+    else
+    {
+        friendlyName = L"Unknown";
+    }
 
     m_transformSource = transformSource;
-    m_name = name;
+    m_name = friendlyName;
 }
 
 winrt::com_ptr<IMFTransform> VideoEncoderDevice::CreateTransform()
