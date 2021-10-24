@@ -23,7 +23,6 @@
     <ClInclude Include="CaptureFrameWait.h" />
     <ClInclude Include="VideoEncoder.h" />
     <ClInclude Include="VideoEncoderDevice.h" />
-    <ClInclude Include="MediaBufferGuard.h" />
     <ClInclude Include="VideoProcessor.h" />
   </ItemGroup>
 </Project>

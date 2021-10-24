@@ -68,6 +68,4 @@
 #include <robmikh.common/hwnd.interop.h>
 #include <robmikh.common/capture.desktop.interop.h>
 #include <robmikh.common/DesktopWindow.h>
-
-// Helpers
-#include "MediaBufferGuard.h"
+#include <robmikh.common/mfHelpers.h>
