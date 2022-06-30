@@ -12,11 +12,6 @@ namespace winrt
     using namespace Windows::UI::Composition;
 }
 
-namespace util
-{
-    using namespace robmikh::common::uwp;
-}
-
 CaptureFrameWait::CaptureFrameWait(
     winrt::IDirect3DDevice const& device,
     winrt::GraphicsCaptureItem const& item,
@@ -30,8 +25,8 @@ CaptureFrameWait::CaptureFrameWait(
     m_closedEvent = wil::shared_event(wil::EventOptions::ManualReset);
 
     m_framePool = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(
-        m_device, 
-        winrt::DirectXPixelFormat::B8G8R8A8UIntNormalized, 
+        m_device,
+        winrt::DirectXPixelFormat::B8G8R8A8UIntNormalized,
         1,
         size);
     m_session = m_framePool.CreateCaptureSession(m_item);
@@ -43,7 +38,8 @@ CaptureFrameWait::CaptureFrameWait(
 CaptureFrameWait::~CaptureFrameWait()
 {
     StopCapture();
-    m_closedEvent.wait();
+    // We might end the capture before we ever get another frame.
+    m_closedEvent.wait(200);
 }
 
 std::optional<CaptureFrame> CaptureFrameWait::TryGetNextFrame()
@@ -73,26 +69,28 @@ std::optional<CaptureFrame> CaptureFrameWait::TryGetNextFrame()
     }
 
     return std::optional<CaptureFrame>(
-    {
-        m_currentFrame.Surface(),
-        m_currentFrame.ContentSize(),
-        m_currentFrame.SystemRelativeTime(),
-    });
+        {
+            m_currentFrame.Surface(),
+            m_currentFrame.ContentSize(),
+            m_currentFrame.SystemRelativeTime(),
+        });
 }
 
 void CaptureFrameWait::StopCapture()
 {
+    auto lock = m_lock.lock_exclusive();
     m_endEvent.SetEvent();
+    m_framePool.Close();
+    m_session.Close();
 }
 
 void CaptureFrameWait::OnFrameArrived(
-    winrt::Direct3D11CaptureFramePool const& sender, 
+    winrt::Direct3D11CaptureFramePool const& sender,
     winrt::IInspectable const&)
 {
+    auto lock = m_lock.lock_exclusive();
     if (m_endEvent.is_signaled())
     {
-        m_framePool.Close();
-        m_session.Close(); 
         m_closedEvent.SetEvent();
         return;
     }

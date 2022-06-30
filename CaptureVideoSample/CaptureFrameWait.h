@@ -32,6 +32,7 @@ private:
     wil::shared_event m_nextFrameEvent;
     wil::shared_event m_endEvent;
     wil::shared_event m_closedEvent;
+    wil::srwlock m_lock;
 
     winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame m_currentFrame{ nullptr };
 };

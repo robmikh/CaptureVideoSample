@@ -23,7 +23,7 @@ namespace util
 int __stdcall WinMain(HINSTANCE, HINSTANCE, PSTR, int)
 {
     // Initialize COM
-    winrt::init_apartment();
+    winrt::init_apartment(winrt::apartment_type::single_threaded);
 
     // Initialize Media Foundation
     winrt::check_hresult(MFStartup(MF_VERSION));
@@ -39,9 +39,6 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, PSTR, int)
             MB_OK | MB_ICONERROR);
         return 1;
     }
-    
-    // Register our window classes
-    MainWindow::RegisterWindowClass();
 
     // Create the DispatcherQueue that the compositor needs to run
     auto controller = util::CreateDispatcherQueueControllerForCurrentThread();
@@ -61,14 +58,12 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, PSTR, int)
     auto target = window.CreateWindowTarget(compositor);
     target.Root(root);
 
-
     // Message pump
-    MSG msg;
+    MSG msg = {};
     while (GetMessageW(&msg, nullptr, 0, 0))
     {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
-
-    return static_cast<int>(msg.wParam);
+    return util::ShutdownDispatcherQueueControllerAndWait(controller, static_cast<int>(msg.wParam));
 }

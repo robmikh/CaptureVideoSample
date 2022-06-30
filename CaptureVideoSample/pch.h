@@ -56,6 +56,7 @@
 #include <functional>
 #include <optional>
 #include <chrono>
+#include <mutex>
 
 // robmikh.common
 #include <robmikh.common/composition.interop.h>

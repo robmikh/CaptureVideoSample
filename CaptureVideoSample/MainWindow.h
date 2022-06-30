@@ -7,7 +7,6 @@ class VideoEncoderDevice;
 struct MainWindow : robmikh::common::desktop::DesktopWindow<MainWindow>
 {
 	static const std::wstring ClassName;
-	static void RegisterWindowClass();
 	MainWindow(std::wstring const& titleString, int width, int height, std::shared_ptr<App> app);
 	LRESULT MessageHandler(UINT const message, WPARAM const wparam, LPARAM const lparam);
 
@@ -42,6 +41,7 @@ private:
 		uint32_t FrameRate;
 	};
 
+	static void RegisterWindowClass();
 	void CreateControls(HINSTANCE instance);
 	size_t GetIndexFromComboBox(HWND comboBox);
 	winrt::fire_and_forget StartRecording();
