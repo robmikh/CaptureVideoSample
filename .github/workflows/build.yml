@@ -8,12 +8,12 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
     
     strategy:
       matrix:
         configuration: [Release]
-        platform: [x86, x64, ARM, ARM64]
+        platform: [x64, ARM64]
 
     steps:
     - uses: actions/checkout@v2
