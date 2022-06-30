@@ -4,6 +4,7 @@
 #include <robmikh.common/ControlsHelper.h>
 
 const std::wstring MainWindow::ClassName = L"CaptureVideoSample.MainWindow";
+std::once_flag MainWindowClassRegistration;
 
 namespace winrt
 {
@@ -38,6 +39,8 @@ void MainWindow::RegisterWindowClass()
 MainWindow::MainWindow(std::wstring const& titleString, int width, int height, std::shared_ptr<App> app)
 {
     auto instance = winrt::check_pointer(GetModuleHandleW(nullptr));
+
+    std::call_once(MainWindowClassRegistration, []() { RegisterWindowClass(); });
 
     winrt::check_bool(CreateWindowExW(0, ClassName.c_str(), titleString.c_str(), WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, width, height, nullptr, nullptr, instance, this));
