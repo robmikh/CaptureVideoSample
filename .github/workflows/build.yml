@@ -1,6 +1,11 @@
 name: Build
 
-on: [pull_request]
+on: 
+  pull_request:
+  push:
+    branches:
+      - master
+      - media-foundation
 
 env:
   # Path to the solution file relative to the root of the project.
