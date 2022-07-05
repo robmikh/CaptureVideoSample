@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "VideoRecordingSession.h"
-#include "CaptureFrameWait.h"
+#include "CaptureFrameGenerator.h"
 
 namespace winrt
 {
@@ -80,8 +80,8 @@ VideoRecordingSession::VideoRecordingSession(
     m_videoEncoder->SetSampleRenderedCallback(std::bind(&VideoRecordingSession::OnSampleRendered, this, std::placeholders::_1));
 
     // Setup capture
-    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item, inputSize);
-    auto weakPointer{ std::weak_ptr{ m_frameWait } };
+    m_frameGenerator = std::make_shared<CaptureFrameGenerator>(m_device, m_item, inputSize);
+    auto weakPointer{ std::weak_ptr{ m_frameGenerator } };
     m_itemClosed = item.Closed(winrt::auto_revoke, [weakPointer](auto&, auto&)
     {
         auto sharedPointer{ weakPointer.lock() };
@@ -149,14 +149,14 @@ void VideoRecordingSession::Close()
         }
         else
         {
-            m_frameWait->StopCapture();
+            m_frameGenerator->StopCapture();
         }
     }
 }
 
 void VideoRecordingSession::CloseInternal()
 {
-    m_frameWait->StopCapture();
+    m_frameGenerator->StopCapture();
     m_itemClosed.revoke();
 }
 
@@ -168,12 +168,12 @@ std::optional<std::unique_ptr<InputSample>> VideoRecordingSession::OnSampleReque
         {
             if (!m_seenFirstTimeStamp)
             {
-                m_firstTimeStamp = frame->SystemRelativeTime;
+                m_firstTimeStamp = frame->SystemRelativeTime();
                 m_seenFirstTimeStamp = true;
             }
-            auto timeStamp = frame->SystemRelativeTime - m_firstTimeStamp;
-            auto contentSize = frame->ContentSize;
-            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->FrameTexture);
+            auto timeStamp = frame->SystemRelativeTime() - m_firstTimeStamp;
+            auto contentSize = frame->ContentSize();
+            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->Surface());
             D3D11_TEXTURE2D_DESC desc = {};
             frameTexture->GetDesc(&desc);
 

@@ -57,6 +57,7 @@
 #include <optional>
 #include <chrono>
 #include <mutex>
+#include <deque>
 
 // robmikh.common
 #include <robmikh.common/composition.interop.h>

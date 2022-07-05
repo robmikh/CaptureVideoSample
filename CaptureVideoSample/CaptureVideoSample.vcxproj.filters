@@ -10,7 +10,7 @@
     <ClCompile Include="MainWindow.cpp" />
     <ClCompile Include="App.cpp" />
     <ClCompile Include="VideoRecordingSession.cpp" />
-    <ClCompile Include="CaptureFrameWait.cpp" />
+    <ClCompile Include="CaptureFrameGenerator.cpp" />
     <ClCompile Include="VideoEncoder.cpp" />
     <ClCompile Include="VideoEncoderDevice.cpp" />
     <ClCompile Include="VideoProcessor.cpp" />
@@ -20,7 +20,7 @@
     <ClInclude Include="MainWindow.h" />
     <ClInclude Include="App.h" />
     <ClInclude Include="VideoRecordingSession.h" />
-    <ClInclude Include="CaptureFrameWait.h" />
+    <ClInclude Include="CaptureFrameGenerator.h" />
     <ClInclude Include="VideoEncoder.h" />
     <ClInclude Include="VideoEncoderDevice.h" />
     <ClInclude Include="VideoProcessor.h" />

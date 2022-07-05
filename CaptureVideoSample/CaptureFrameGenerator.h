@@ -1,22 +1,15 @@
 #pragma once
 
-struct CaptureFrame
-{
-    winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DSurface FrameTexture;
-    winrt::Windows::Graphics::SizeInt32 ContentSize;
-    winrt::Windows::Foundation::TimeSpan SystemRelativeTime;
-};
-
-class CaptureFrameWait
+class CaptureFrameGenerator
 {
 public:
-    CaptureFrameWait(
+    CaptureFrameGenerator(
         winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice const& device,
         winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& item,
         winrt::Windows::Graphics::SizeInt32 const& size);
-    ~CaptureFrameWait();
+    ~CaptureFrameGenerator();
 
-    std::optional<CaptureFrame> TryGetNextFrame();
+    std::optional<winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame> TryGetNextFrame();
     void StopCapture();
 
 private:
@@ -33,6 +26,5 @@ private:
     wil::shared_event m_endEvent;
     wil::shared_event m_closedEvent;
     wil::srwlock m_lock;
-
-    winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame m_currentFrame{ nullptr };
+    std::deque<winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame> m_frames;
 };

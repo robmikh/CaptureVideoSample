@@ -1,5 +1,5 @@
 #pragma once
-#include "CaptureFrameWait.h"
+#include "CaptureFrameGenerator.h"
 #include "VideoEncoder.h"
 #include "VideoEncoderDevice.h"
 #include "VideoProcessor.h"
@@ -36,7 +36,7 @@ private:
 
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_item{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem::Closed_revoker m_itemClosed;
-    std::shared_ptr<CaptureFrameWait> m_frameWait;
+    std::shared_ptr<CaptureFrameGenerator> m_frameGenerator;
 
     std::shared_ptr<VideoEncoder> m_videoEncoder;
 
