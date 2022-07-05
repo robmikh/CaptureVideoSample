@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "VideoRecordingSession.h"
-#include "CaptureFrameWait.h"
+#include "CaptureFrameGenerator.h"
 
 namespace winrt
 {
@@ -54,8 +54,8 @@ VideoRecordingSession::VideoRecordingSession(
     auto outputWidth = EnsureEven(resolution.Width);
     auto outputHeight = EnsureEven(resolution.Height);
 
-    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item, winrt::SizeInt32{ inputWidth, inputHeight });
-    auto weakPointer{ std::weak_ptr{ m_frameWait } };
+    m_frameGenerator = std::make_shared<CaptureFrameGenerator>(m_device, m_item, winrt::SizeInt32{ inputWidth, inputHeight });
+    auto weakPointer{ std::weak_ptr{ m_frameGenerator } };
     m_itemClosed = item.Closed(winrt::auto_revoke, [weakPointer](auto&, auto&)
     {
         auto sharedPointer{ weakPointer.lock() };
@@ -139,14 +139,14 @@ void VideoRecordingSession::Close()
         }
         else
         {
-            m_frameWait->StopCapture();
+            m_frameGenerator->StopCapture();
         }
     }
 }
 
 void VideoRecordingSession::CloseInternal()
 {
-    m_frameWait->StopCapture();
+    m_frameGenerator->StopCapture();
     m_itemClosed.revoke();
 }
 
@@ -154,8 +154,8 @@ void VideoRecordingSession::OnMediaStreamSourceStarting(
     winrt::MediaStreamSource const&, 
     winrt::MediaStreamSourceStartingEventArgs const& args)
 {
-    auto frame = *m_frameWait->TryGetNextFrame();
-    args.Request().SetActualStartPosition(frame.SystemRelativeTime);
+    auto frame = *m_frameGenerator->TryGetNextFrame();
+    args.Request().SetActualStartPosition(frame.SystemRelativeTime());
 }
 
 void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
@@ -163,13 +163,13 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
     winrt::MediaStreamSourceSampleRequestedEventArgs const& args)
 {
     auto request = args.Request();
-    if (auto frame = m_frameWait->TryGetNextFrame())
+    if (auto frame = m_frameGenerator->TryGetNextFrame())
     {
         try
         {
-            auto timeStamp = frame->SystemRelativeTime;
-            auto contentSize = frame->ContentSize;
-            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->FrameTexture);
+            auto timeStamp = frame->SystemRelativeTime();
+            auto contentSize = frame->ContentSize();
+            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->Surface());
             D3D11_TEXTURE2D_DESC desc = {};
             frameTexture->GetDesc(&desc);
 

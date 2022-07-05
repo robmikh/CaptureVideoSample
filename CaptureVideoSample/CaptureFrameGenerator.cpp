@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "CaptureFrameWait.h"
+#include "CaptureFrameGenerator.h"
 
 namespace winrt
 {
@@ -12,7 +12,7 @@ namespace winrt
     using namespace Windows::UI::Composition;
 }
 
-CaptureFrameWait::CaptureFrameWait(
+CaptureFrameGenerator::CaptureFrameGenerator(
     winrt::IDirect3DDevice const& device,
     winrt::GraphicsCaptureItem const& item,
     winrt::SizeInt32 const& size)
@@ -27,29 +27,38 @@ CaptureFrameWait::CaptureFrameWait(
     m_framePool = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(
         m_device,
         winrt::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-        1,
+        3,
         size);
     m_session = m_framePool.CreateCaptureSession(m_item);
 
-    m_framePool.FrameArrived({ this, &CaptureFrameWait::OnFrameArrived });
+    m_framePool.FrameArrived({ this, &CaptureFrameGenerator::OnFrameArrived });
     m_session.StartCapture();
 }
 
-CaptureFrameWait::~CaptureFrameWait()
+CaptureFrameGenerator::~CaptureFrameGenerator()
 {
     StopCapture();
     // We might end the capture before we ever get another frame.
     m_closedEvent.wait(200);
 }
 
-std::optional<CaptureFrame> CaptureFrameWait::TryGetNextFrame()
+std::optional<winrt::Direct3D11CaptureFrame> CaptureFrameGenerator::TryGetNextFrame()
 {
-    if (m_currentFrame != nullptr)
     {
-        m_currentFrame.Close();
+        auto lock = m_lock.lock_exclusive();
+        if (m_frames.empty() && m_endEvent.is_signaled())
+        {
+            return std::nullopt;
+        }
+        else if (!m_frames.empty())
+        {
+            std::optional result(m_frames.front());
+            m_frames.pop_front();
+            return result;
+        }
     }
-    m_nextFrameEvent.ResetEvent();
 
+    m_nextFrameEvent.ResetEvent();
     std::vector<HANDLE> events = { m_endEvent.get(), m_nextFrameEvent.get() };
     auto waitResult = WaitForMultipleObjectsEx(static_cast<DWORD>(events.size()), events.data(), false, INFINITE, false);
     auto eventIndex = -1;
@@ -67,16 +76,16 @@ std::optional<CaptureFrame> CaptureFrameWait::TryGetNextFrame()
     {
         return std::nullopt;
     }
-
-    return std::optional<CaptureFrame>(
-        {
-            m_currentFrame.Surface(),
-            m_currentFrame.ContentSize(),
-            m_currentFrame.SystemRelativeTime(),
-        });
+    else
+    {
+        auto lock = m_lock.lock_exclusive();
+        std::optional result(m_frames.front());
+        m_frames.pop_front();
+        return result;
+    }
 }
 
-void CaptureFrameWait::StopCapture()
+void CaptureFrameGenerator::StopCapture()
 {
     auto lock = m_lock.lock_exclusive();
     m_endEvent.SetEvent();
@@ -84,7 +93,7 @@ void CaptureFrameWait::StopCapture()
     m_session.Close();
 }
 
-void CaptureFrameWait::OnFrameArrived(
+void CaptureFrameGenerator::OnFrameArrived(
     winrt::Direct3D11CaptureFramePool const& sender,
     winrt::IInspectable const&)
 {
@@ -94,6 +103,6 @@ void CaptureFrameWait::OnFrameArrived(
         m_closedEvent.SetEvent();
         return;
     }
-    m_currentFrame = sender.TryGetNextFrame();
+    m_frames.push_back(sender.TryGetNextFrame());
     m_nextFrameEvent.SetEvent();
 }

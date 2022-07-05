@@ -1,5 +1,5 @@
 #pragma once
-#include "CaptureFrameWait.h"
+#include "CaptureFrameGenerator.h"
 
 class VideoRecordingSession
 {
@@ -34,7 +34,7 @@ private:
 
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_item{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem::Closed_revoker m_itemClosed;
-    std::shared_ptr<CaptureFrameWait> m_frameWait;
+    std::shared_ptr<CaptureFrameGenerator> m_frameGenerator;
 
     winrt::Windows::Storage::Streams::IRandomAccessStream m_stream{ nullptr };
     winrt::Windows::Media::MediaProperties::MediaEncodingProfile m_encodingProfile{ nullptr };
