@@ -1,10 +1,10 @@
 #pragma once
 #include "CaptureFrameGenerator.h"
 
-class VideoRecordingSession
+class VideoRecordingSession : public std::enable_shared_from_this<VideoRecordingSession>
 {
 public:
-    VideoRecordingSession(
+    [[nodiscard]] static std::shared_ptr<VideoRecordingSession> Create(
         winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice const& device,
         winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& item,
         winrt::Windows::Graphics::SizeInt32 const& resolution,
@@ -18,6 +18,13 @@ public:
     winrt::Windows::UI::Composition::ICompositionSurface CreatePreviewSurface(winrt::Windows::UI::Composition::Compositor const& compositor);
 
 private:
+    VideoRecordingSession(
+        winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice const& device,
+        winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& item,
+        winrt::Windows::Graphics::SizeInt32 const& resolution,
+        uint32_t bitRate,
+        uint32_t frameRate,
+        winrt::Windows::Storage::Streams::IRandomAccessStream const& stream);
     void CloseInternal();
 
     void OnMediaStreamSourceStarting(

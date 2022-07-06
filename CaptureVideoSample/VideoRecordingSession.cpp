@@ -100,6 +100,17 @@ VideoRecordingSession::VideoRecordingSession(
     winrt::check_hresult(m_d3dDevice->CreateRenderTargetView(backBuffer.get(), nullptr, m_renderTargetView.put()));
 }
 
+std::shared_ptr<VideoRecordingSession> VideoRecordingSession::Create(
+    winrt::IDirect3DDevice const& device,
+    winrt::GraphicsCaptureItem const& item,
+    winrt::SizeInt32 const& resolution,
+    uint32_t bitRate,
+    uint32_t frameRate,
+    winrt::Windows::Storage::Streams::IRandomAccessStream const& stream)
+{
+    return std::shared_ptr<VideoRecordingSession>(new VideoRecordingSession(device, item, resolution, bitRate, frameRate, stream));
+}
+
 VideoRecordingSession::~VideoRecordingSession()
 {
     Close();
@@ -119,6 +130,9 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
         // Create our transcoder
         m_transcoder = winrt::MediaTranscoder();
         m_transcoder.HardwareAccelerationEnabled(true);
+
+        // Hold a reference to ourselves
+        auto self = shared_from_this();
 
         // Start encoding
         auto transcode = co_await m_transcoder.PrepareMediaStreamSourceTranscodeAsync(m_streamSource, m_stream, m_encodingProfile);
