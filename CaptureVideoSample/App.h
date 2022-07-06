@@ -22,5 +22,5 @@ private:
     winrt::Windows::UI::Composition::CompositionSurfaceBrush m_brush{ nullptr };
 
     winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice m_device{ nullptr };
-    std::unique_ptr<VideoRecordingSession> m_recordingSession;
+    std::shared_ptr<VideoRecordingSession> m_recordingSession;
 };

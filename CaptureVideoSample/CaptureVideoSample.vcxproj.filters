@@ -10,13 +10,13 @@
     <ClCompile Include="MainWindow.cpp" />
     <ClCompile Include="App.cpp" />
     <ClCompile Include="VideoRecordingSession.cpp" />
-    <ClCompile Include="CaptureFrameWait.cpp" />
+    <ClCompile Include="CaptureFrameGenerator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="MainWindow.h" />
     <ClInclude Include="App.h" />
     <ClInclude Include="VideoRecordingSession.h" />
-    <ClInclude Include="CaptureFrameWait.h" />
+    <ClInclude Include="CaptureFrameGenerator.h" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "VideoRecordingSession.h"
-#include "CaptureFrameWait.h"
+#include "CaptureFrameGenerator.h"
 
 namespace winrt
 {
@@ -54,8 +54,8 @@ VideoRecordingSession::VideoRecordingSession(
     auto outputWidth = EnsureEven(resolution.Width);
     auto outputHeight = EnsureEven(resolution.Height);
 
-    m_frameWait = std::make_shared<CaptureFrameWait>(m_device, m_item, winrt::SizeInt32{ inputWidth, inputHeight });
-    auto weakPointer{ std::weak_ptr{ m_frameWait } };
+    m_frameGenerator = std::make_shared<CaptureFrameGenerator>(m_device, m_item, winrt::SizeInt32{ inputWidth, inputHeight });
+    auto weakPointer{ std::weak_ptr{ m_frameGenerator } };
     m_itemClosed = item.Closed(winrt::auto_revoke, [weakPointer](auto&, auto&)
     {
         auto sharedPointer{ weakPointer.lock() };
@@ -100,6 +100,17 @@ VideoRecordingSession::VideoRecordingSession(
     winrt::check_hresult(m_d3dDevice->CreateRenderTargetView(backBuffer.get(), nullptr, m_renderTargetView.put()));
 }
 
+std::shared_ptr<VideoRecordingSession> VideoRecordingSession::Create(
+    winrt::IDirect3DDevice const& device,
+    winrt::GraphicsCaptureItem const& item,
+    winrt::SizeInt32 const& resolution,
+    uint32_t bitRate,
+    uint32_t frameRate,
+    winrt::Windows::Storage::Streams::IRandomAccessStream const& stream)
+{
+    return std::shared_ptr<VideoRecordingSession>(new VideoRecordingSession(device, item, resolution, bitRate, frameRate, stream));
+}
+
 VideoRecordingSession::~VideoRecordingSession()
 {
     Close();
@@ -120,6 +131,9 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
         m_transcoder = winrt::MediaTranscoder();
         m_transcoder.HardwareAccelerationEnabled(true);
 
+        // Hold a reference to ourselves
+        auto self = shared_from_this();
+
         // Start encoding
         auto transcode = co_await m_transcoder.PrepareMediaStreamSourceTranscodeAsync(m_streamSource, m_stream, m_encodingProfile);
         co_await transcode.TranscodeAsync();
@@ -139,14 +153,14 @@ void VideoRecordingSession::Close()
         }
         else
         {
-            m_frameWait->StopCapture();
+            m_frameGenerator->StopCapture();
         }
     }
 }
 
 void VideoRecordingSession::CloseInternal()
 {
-    m_frameWait->StopCapture();
+    m_frameGenerator->StopCapture();
     m_itemClosed.revoke();
 }
 
@@ -154,8 +168,8 @@ void VideoRecordingSession::OnMediaStreamSourceStarting(
     winrt::MediaStreamSource const&, 
     winrt::MediaStreamSourceStartingEventArgs const& args)
 {
-    auto frame = *m_frameWait->TryGetNextFrame();
-    args.Request().SetActualStartPosition(frame.SystemRelativeTime);
+    auto frame = *m_frameGenerator->TryGetNextFrame();
+    args.Request().SetActualStartPosition(frame.SystemRelativeTime());
 }
 
 void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
@@ -163,13 +177,13 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
     winrt::MediaStreamSourceSampleRequestedEventArgs const& args)
 {
     auto request = args.Request();
-    if (auto frame = m_frameWait->TryGetNextFrame())
+    if (auto frame = m_frameGenerator->TryGetNextFrame())
     {
         try
         {
-            auto timeStamp = frame->SystemRelativeTime;
-            auto contentSize = frame->ContentSize;
-            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->FrameTexture);
+            auto timeStamp = frame->SystemRelativeTime();
+            auto contentSize = frame->ContentSize();
+            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->Surface());
             D3D11_TEXTURE2D_DESC desc = {};
             frameTexture->GetDesc(&desc);
 
