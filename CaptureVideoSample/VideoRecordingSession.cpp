@@ -168,8 +168,11 @@ void VideoRecordingSession::OnMediaStreamSourceStarting(
     winrt::MediaStreamSource const&, 
     winrt::MediaStreamSourceStartingEventArgs const& args)
 {
-    auto frame = *m_frameGenerator->TryGetNextFrame();
-    args.Request().SetActualStartPosition(frame.SystemRelativeTime());
+    // Fast users may end the recording before we've received a frame.
+    if (auto frame = m_frameGenerator->TryGetNextFrame())
+    {
+        args.Request().SetActualStartPosition(frame->SystemRelativeTime());
+    }
 }
 
 void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
