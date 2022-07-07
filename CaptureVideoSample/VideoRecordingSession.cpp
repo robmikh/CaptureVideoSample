@@ -124,6 +124,9 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
         // Create our MediaStreamSource
         m_streamSource = winrt::MediaStreamSource(m_videoDescriptor);
         m_streamSource.BufferTime(std::chrono::seconds(0));
+        m_streamSource.IsLive(true);
+        m_streamSource.CanSeek(false);
+        m_streamSource.MaxSupportedPlaybackRate(1.0);
         m_streamSource.Starting({ this, &VideoRecordingSession::OnMediaStreamSourceStarting });
         m_streamSource.SampleRequested({ this, &VideoRecordingSession::OnMediaStreamSourceSampleRequested });
 
@@ -180,13 +183,15 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
     winrt::MediaStreamSourceSampleRequestedEventArgs const& args)
 {
     auto request = args.Request();
-    if (auto frame = m_frameGenerator->TryGetNextFrame())
+    if (auto frameOpt = m_frameGenerator->TryGetNextFrame())
     {
         try
         {
-            auto timeStamp = frame->SystemRelativeTime();
-            auto contentSize = frame->ContentSize();
-            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->Surface());
+            auto frame = frameOpt.value();
+
+            auto timeStamp = frame.SystemRelativeTime();
+            auto contentSize = frame.ContentSize();
+            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
             D3D11_TEXTURE2D_DESC desc = {};
             frameTexture->GetDesc(&desc);
 
@@ -236,6 +241,15 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
             winrt::check_hresult(m_previewSwapChain->Present1(0, 0, &presentParameters));
 
             auto sample = winrt::MediaStreamSample::CreateFromDirect3D11Surface(sampleSurface, timeStamp);
+            auto self = std::weak_ptr{ shared_from_this() };
+            sample.Processed([self](auto& sender, auto&)
+                {
+                    auto thisRef = self.lock();
+                    auto frame = thisRef->m_outstandingFrames.at(sender);
+                    thisRef->m_outstandingFrames.erase(sender);
+                    frame.Close();
+                });
+            m_outstandingFrames.insert({ sample, frame });
             request.Sample(sample);
         }
         catch (winrt::hresult_error const& error)

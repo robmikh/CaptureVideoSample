@@ -42,6 +42,7 @@ private:
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_item{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem::Closed_revoker m_itemClosed;
     std::shared_ptr<CaptureFrameGenerator> m_frameGenerator;
+    std::map<winrt::Windows::Media::Core::MediaStreamSample, winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame> m_outstandingFrames;
 
     winrt::Windows::Storage::Streams::IRandomAccessStream m_stream{ nullptr };
     winrt::Windows::Media::MediaProperties::MediaEncodingProfile m_encodingProfile{ nullptr };
