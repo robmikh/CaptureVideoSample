@@ -103,6 +103,16 @@ void CaptureFrameGenerator::OnFrameArrived(
         m_closedEvent.SetEvent();
         return;
     }
-    m_frames.push_back(sender.TryGetNextFrame());
-    m_nextFrameEvent.SetEvent();
+    auto frame = sender.TryGetNextFrame();
+    auto timeStamp = frame.SystemRelativeTime();
+    if (m_lastSeenTimestmap.count() == 0 || (timeStamp - m_lastSeenTimestmap) >= std::chrono::milliseconds(16))
+    {
+        m_lastSeenTimestmap = timeStamp;
+        m_frames.push_back(std::move(frame));
+        m_nextFrameEvent.SetEvent();
+    }
+    else
+    {
+        frame.Close();
+    }
 }
