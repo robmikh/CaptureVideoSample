@@ -162,20 +162,24 @@ void VideoRecordingSession::CloseInternal()
 
 std::optional<std::unique_ptr<InputSample>> VideoRecordingSession::OnSampleRequested()
 {
-    if (auto frame = m_frameWait->TryGetNextFrame())
+    if (auto frameOpt = m_frameGenerator->TryGetNextFrame())
     {
         try
         {
+            auto frame = frameOpt.value();
+
             if (!m_seenFirstTimeStamp)
             {
-                m_firstTimeStamp = frame->SystemRelativeTime();
+                m_firstTimeStamp = frame.SystemRelativeTime();
                 m_seenFirstTimeStamp = true;
             }
-            auto timeStamp = frame->SystemRelativeTime() - m_firstTimeStamp;
-            auto contentSize = frame->ContentSize();
-            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->Surface());
+            auto timeStamp = frame.SystemRelativeTime() - m_firstTimeStamp;
+            auto contentSize = frame.ContentSize();
+            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
             D3D11_TEXTURE2D_DESC desc = {};
             frameTexture->GetDesc(&desc);
+
+            m_outstandingFrames.insert({ timeStamp, frame });
 
             winrt::com_ptr<ID3D11Texture2D> backBuffer;
             winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
@@ -240,6 +244,15 @@ std::optional<std::unique_ptr<InputSample>> VideoRecordingSession::OnSampleReque
 void VideoRecordingSession::OnSampleRendered(std::unique_ptr<OutputSample> sample)
 {
     auto mfSample = sample->MFSample;
+
+    // Retire the frame
+    int64_t time = 0;
+    winrt::check_hresult(mfSample->GetSampleTime(&time));
+    auto timeStamp = winrt::TimeSpan{ time };
+    winrt::Direct3D11CaptureFrame frame = m_outstandingFrames.at(timeStamp);
+    m_outstandingFrames.erase(timeStamp);
+    frame.Close();
+
     winrt::check_hresult(m_sinkWriter->WriteSample(m_sinkWriterStreamIndex, mfSample.get()));
 }
 

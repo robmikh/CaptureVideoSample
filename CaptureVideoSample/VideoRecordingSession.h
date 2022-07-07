@@ -37,6 +37,7 @@ private:
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_item{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem::Closed_revoker m_itemClosed;
     std::shared_ptr<CaptureFrameGenerator> m_frameGenerator;
+    std::map<winrt::Windows::Foundation::TimeSpan, winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame> m_outstandingFrames;
 
     std::shared_ptr<VideoEncoder> m_videoEncoder;
 
