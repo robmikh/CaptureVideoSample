@@ -27,4 +27,5 @@ private:
     wil::shared_event m_closedEvent;
     wil::srwlock m_lock;
     std::deque<winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame> m_frames;
+    winrt::Windows::Foundation::TimeSpan m_lastSeenTimestmap = {};
 };
