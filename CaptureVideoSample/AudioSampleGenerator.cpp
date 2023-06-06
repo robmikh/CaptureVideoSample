@@ -4,19 +4,13 @@
 namespace winrt
 {
     using namespace Windows::Foundation;
-    using namespace Windows::Graphics;
-    using namespace Windows::Graphics::Capture;
-    using namespace Windows::Graphics::DirectX;
-    using namespace Windows::Graphics::DirectX::Direct3D11;
     using namespace Windows::Storage;
     using namespace Windows::Storage::Streams;
-    using namespace Windows::UI::Composition;
     using namespace Windows::Media;
     using namespace Windows::Media::Audio;
     using namespace Windows::Media::Capture;
     using namespace Windows::Media::Core;
     using namespace Windows::Media::Render;
-    using namespace Windows::Media::Transcoding;
     using namespace Windows::Media::MediaProperties;
 }
 
@@ -73,15 +67,15 @@ std::optional<winrt::MediaStreamSample> AudioSampleGenerator::TryGetNextSample()
     CheckStarted();
 
     {
-        auto lock = m_audioLock.lock_exclusive();
-        if (m_audioSamples.empty() && m_endEvent.is_signaled())
+        auto lock = m_lock.lock_exclusive();
+        if (m_samples.empty() && m_endEvent.is_signaled())
         {
             return std::nullopt;
         }
-        else if (!m_audioSamples.empty())
+        else if (!m_samples.empty())
         {
-            std::optional result(m_audioSamples.front());
-            m_audioSamples.pop_front();
+            std::optional result(m_samples.front());
+            m_samples.pop_front();
             return result;
         }
     }
@@ -106,9 +100,9 @@ std::optional<winrt::MediaStreamSample> AudioSampleGenerator::TryGetNextSample()
     }
     else
     {
-        auto lock = m_audioLock.lock_exclusive();
-        std::optional result(m_audioSamples.front());
-        m_audioSamples.pop_front();
+        auto lock = m_lock.lock_exclusive();
+        std::optional result(m_samples.front());
+        m_samples.pop_front();
         return result;
     }
 }
@@ -136,7 +130,7 @@ void AudioSampleGenerator::Stop()
 void AudioSampleGenerator::OnAudioQuantumStarted(winrt::AudioGraph const& sender, winrt::IInspectable const& args)
 {
     {
-        auto lock = m_audioLock.lock_exclusive();
+        auto lock = m_lock.lock_exclusive();
 
         auto frame = m_audioOutputNode.GetFrame();
         std::optional<winrt::TimeSpan> timestamp = frame.RelativeTime();
@@ -145,7 +139,7 @@ void AudioSampleGenerator::OnAudioQuantumStarted(winrt::AudioGraph const& sender
         auto sampleBuffer = winrt::Buffer::CreateCopyFromMemoryBuffer(audioBuffer);
         sampleBuffer.Length(audioBuffer.Length());
         auto sample = winrt::MediaStreamSample::CreateFromBuffer(sampleBuffer, timestamp.value());
-        m_audioSamples.push_back(sample);
+        m_samples.push_back(sample);
     }
     m_audioEvent.SetEvent();
 }
