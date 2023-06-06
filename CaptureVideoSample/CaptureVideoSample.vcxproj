@@ -108,6 +108,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp" />
+    <ClCompile Include="AudioSampleGenerator.cpp" />
     <ClCompile Include="CaptureFrameGenerator.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MainWindow.cpp" />
@@ -116,6 +117,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
+    <ClInclude Include="AudioSampleGenerator.h" />
     <ClInclude Include="CaptureFrameGenerator.h" />
     <ClInclude Include="MainWindow.h" />
     <ClInclude Include="pch.h" />

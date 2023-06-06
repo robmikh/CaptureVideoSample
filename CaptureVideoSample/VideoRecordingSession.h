@@ -1,5 +1,6 @@
 #pragma once
 #include "CaptureFrameGenerator.h"
+#include "AudioSampleGenerator.h"
 
 class VideoRecordingSession : public std::enable_shared_from_this<VideoRecordingSession>
 {
@@ -34,10 +35,6 @@ private:
         winrt::Windows::Media::Core::MediaStreamSource const& sender,
         winrt::Windows::Media::Core::MediaStreamSourceSampleRequestedEventArgs const& args);
 
-    void OnAudioQuantumStarted(
-        winrt::Windows::Media::Audio::AudioGraph const& sender,
-        winrt::Windows::Foundation::IInspectable const& args);
-
 private:
     winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice m_device{ nullptr };
     winrt::com_ptr<ID3D11Device> m_d3dDevice;
@@ -53,13 +50,7 @@ private:
     winrt::Windows::Media::Core::MediaStreamSource m_streamSource{ nullptr };
     winrt::Windows::Media::Transcoding::MediaTranscoder m_transcoder{ nullptr };
 
-    winrt::Windows::Media::Audio::AudioGraph m_audioGraph{ nullptr };
-    winrt::Windows::Media::Audio::AudioDeviceInputNode m_audioInputNode{ nullptr };
-    winrt::Windows::Media::Audio::AudioFrameOutputNode m_audioOutputNode{ nullptr };
-    wil::srwlock m_audioLock;
-    wil::unique_event m_audioEvent;
-    std::deque<winrt::Windows::Media::Core::MediaStreamSample> m_audioSamples;
-    bool m_ended = false;
+    std::unique_ptr<AudioSampleGenerator> m_audioGenerator;
 
     winrt::com_ptr<IDXGISwapChain1> m_previewSwapChain;
     winrt::com_ptr<ID3D11RenderTargetView> m_renderTargetView;

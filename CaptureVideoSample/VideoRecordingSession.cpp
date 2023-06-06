@@ -107,7 +107,7 @@ VideoRecordingSession::VideoRecordingSession(
     winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
     winrt::check_hresult(m_d3dDevice->CreateRenderTargetView(backBuffer.get(), nullptr, m_renderTargetView.put()));
 
-    m_audioEvent.create(wil::EventOptions::None);
+    m_audioGenerator = std::make_unique<AudioSampleGenerator>();
 }
 
 std::shared_ptr<VideoRecordingSession> VideoRecordingSession::Create(
@@ -131,30 +131,10 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
     auto expected = false;
     if (m_isRecording.compare_exchange_strong(expected, true))
     {
-        // Initialize the audio graph
-        auto audioGraphSettings = winrt::AudioGraphSettings(winrt::AudioRenderCategory::Media);
-        auto audioGraphResult = co_await winrt::AudioGraph::CreateAsync(audioGraphSettings);
-        if (audioGraphResult.Status() != winrt::AudioGraphCreationStatus::Success)
-        {
-            throw winrt::hresult_error(E_FAIL, L"Failed to initialize AudioGraph!");
-        }
-        m_audioGraph = audioGraphResult.Graph();
-
-        // Initialize audio input and output nodes
-        auto inputNodeResult = co_await m_audioGraph.CreateDeviceInputNodeAsync(winrt::MediaCategory::Media);
-        if (inputNodeResult.Status() != winrt::AudioDeviceNodeCreationStatus::Success)
-        {
-            throw winrt::hresult_error(E_FAIL, L"Failed to initialize input audio node!");
-        }
-        m_audioInputNode = inputNodeResult.DeviceInputNode();
-        m_audioOutputNode = m_audioGraph.CreateFrameOutputNode();
-        
-        // Hookup audio nodes
-        m_audioInputNode.AddOutgoingConnection(m_audioOutputNode);
-        m_audioGraph.QuantumStarted({ this, &VideoRecordingSession::OnAudioQuantumStarted });
+        co_await m_audioGenerator->InitializeAsync();
 
         // Create our MediaStreamSource
-        m_streamSource = winrt::MediaStreamSource(m_videoDescriptor, winrt::AudioStreamDescriptor(m_audioOutputNode.EncodingProperties()));
+        m_streamSource = winrt::MediaStreamSource(m_videoDescriptor, winrt::AudioStreamDescriptor(m_audioGenerator->GetEncodingProperties()));
         m_streamSource.BufferTime(std::chrono::seconds(0));
         m_streamSource.Starting({ this, &VideoRecordingSession::OnMediaStreamSourceStarting });
         m_streamSource.SampleRequested({ this, &VideoRecordingSession::OnMediaStreamSourceSampleRequested });
@@ -192,8 +172,7 @@ void VideoRecordingSession::Close()
 
 void VideoRecordingSession::CloseInternal()
 {
-    m_audioGraph.Stop();
-    m_audioGraph.Close();
+    m_audioGenerator->Stop();
     m_frameGenerator->StopCapture();
     m_itemClosed.revoke();
 }
@@ -206,7 +185,7 @@ void VideoRecordingSession::OnMediaStreamSourceStarting(
     if (auto frame = m_frameGenerator->TryGetNextFrame())
     {
         args.Request().SetActualStartPosition(frame->SystemRelativeTime());
-        m_audioGraph.Start();
+        m_audioGenerator->Start();
     }
 }
 
@@ -286,30 +265,15 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
         }
         else
         {
-            m_ended = true;
             request.Sample(nullptr);
             CloseInternal();
         }
     }
     else if (auto audioStreamDescriptor = streamDescriptor.try_as<winrt::AudioStreamDescriptor>())
     {
-        // TODO: This locking mechanism makes for a choppy video
-        if (!m_ended)
+        if (auto sample = m_audioGenerator->TryGetNextSample())
         {
-            m_audioEvent.wait();
-            winrt::MediaStreamSample sample{ nullptr };
-            {
-                auto lock = m_audioLock.lock_exclusive();
-                sample = m_audioSamples.front();
-                m_audioSamples.pop_front();
-            }
-            request.Sample(sample);
-        }
-        else if (!m_audioSamples.empty())
-        {
-            auto sample = m_audioSamples.front();
-            m_audioSamples.pop_front();
-            request.Sample(sample);
+            request.Sample(sample.value());
         }
         else
         {
@@ -320,23 +284,6 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
     {
         throw winrt::hresult_error(E_UNEXPECTED);
     }
-}
-
-void VideoRecordingSession::OnAudioQuantumStarted(winrt::AudioGraph const& sender, winrt::IInspectable const&)
-{
-    {
-        auto lock = m_audioLock.lock_exclusive();
-
-        auto frame = m_audioOutputNode.GetFrame();
-        std::optional<winrt::TimeSpan> timestamp = frame.RelativeTime();
-        auto audioBuffer = frame.LockBuffer(winrt::AudioBufferAccessMode::Read);
-        
-        auto sampleBuffer = winrt::Buffer::CreateCopyFromMemoryBuffer(audioBuffer);
-        sampleBuffer.Length(audioBuffer.Length());
-        auto sample = winrt::MediaStreamSample::CreateFromBuffer(sampleBuffer, timestamp.value());
-        m_audioSamples.push_back(sample);
-    }
-    m_audioEvent.SetEvent();
 }
 
 winrt::ICompositionSurface VideoRecordingSession::CreatePreviewSurface(winrt::Compositor const& compositor)
