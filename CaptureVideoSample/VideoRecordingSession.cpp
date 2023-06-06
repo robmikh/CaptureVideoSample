@@ -10,8 +10,13 @@ namespace winrt
     using namespace Windows::Graphics::DirectX;
     using namespace Windows::Graphics::DirectX::Direct3D11;
     using namespace Windows::Storage;
+    using namespace Windows::Storage::Streams;
     using namespace Windows::UI::Composition;
+    using namespace Windows::Media;
+    using namespace Windows::Media::Audio;
+    using namespace Windows::Media::Capture;
     using namespace Windows::Media::Core;
+    using namespace Windows::Media::Render;
     using namespace Windows::Media::Transcoding;
     using namespace Windows::Media::MediaProperties;
 }
@@ -79,6 +84,9 @@ VideoRecordingSession::VideoRecordingSession(
     video.PixelAspectRatio().Numerator(1);
     video.PixelAspectRatio().Denominator(1);
     m_encodingProfile.Video(video);
+    auto audio = m_encodingProfile.Audio();
+    audio = winrt::AudioEncodingProperties::CreateAac(44100, 2, 16);
+    m_encodingProfile.Audio(audio);
 
     // Describe our input: uncompressed BGRA8 buffers
     auto properties = winrt::VideoEncodingProperties::CreateUncompressed(
@@ -98,6 +106,8 @@ VideoRecordingSession::VideoRecordingSession(
     winrt::com_ptr<ID3D11Texture2D> backBuffer;
     winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
     winrt::check_hresult(m_d3dDevice->CreateRenderTargetView(backBuffer.get(), nullptr, m_renderTargetView.put()));
+
+    m_audioEvent.create(wil::EventOptions::None);
 }
 
 std::shared_ptr<VideoRecordingSession> VideoRecordingSession::Create(
@@ -121,8 +131,30 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
     auto expected = false;
     if (m_isRecording.compare_exchange_strong(expected, true))
     {
+        // Initialize the audio graph
+        auto audioGraphSettings = winrt::AudioGraphSettings(winrt::AudioRenderCategory::Media);
+        auto audioGraphResult = co_await winrt::AudioGraph::CreateAsync(audioGraphSettings);
+        if (audioGraphResult.Status() != winrt::AudioGraphCreationStatus::Success)
+        {
+            throw winrt::hresult_error(E_FAIL, L"Failed to initialize AudioGraph!");
+        }
+        m_audioGraph = audioGraphResult.Graph();
+
+        // Initialize audio input and output nodes
+        auto inputNodeResult = co_await m_audioGraph.CreateDeviceInputNodeAsync(winrt::MediaCategory::Media);
+        if (inputNodeResult.Status() != winrt::AudioDeviceNodeCreationStatus::Success)
+        {
+            throw winrt::hresult_error(E_FAIL, L"Failed to initialize input audio node!");
+        }
+        m_audioInputNode = inputNodeResult.DeviceInputNode();
+        m_audioOutputNode = m_audioGraph.CreateFrameOutputNode();
+        
+        // Hookup audio nodes
+        m_audioInputNode.AddOutgoingConnection(m_audioOutputNode);
+        m_audioGraph.QuantumStarted({ this, &VideoRecordingSession::OnAudioQuantumStarted });
+
         // Create our MediaStreamSource
-        m_streamSource = winrt::MediaStreamSource(m_videoDescriptor);
+        m_streamSource = winrt::MediaStreamSource(m_videoDescriptor, winrt::AudioStreamDescriptor(m_audioOutputNode.EncodingProperties()));
         m_streamSource.BufferTime(std::chrono::seconds(0));
         m_streamSource.Starting({ this, &VideoRecordingSession::OnMediaStreamSourceStarting });
         m_streamSource.SampleRequested({ this, &VideoRecordingSession::OnMediaStreamSourceSampleRequested });
@@ -160,6 +192,8 @@ void VideoRecordingSession::Close()
 
 void VideoRecordingSession::CloseInternal()
 {
+    m_audioGraph.Stop();
+    m_audioGraph.Close();
     m_frameGenerator->StopCapture();
     m_itemClosed.revoke();
 }
@@ -172,6 +206,7 @@ void VideoRecordingSession::OnMediaStreamSourceStarting(
     if (auto frame = m_frameGenerator->TryGetNextFrame())
     {
         args.Request().SetActualStartPosition(frame->SystemRelativeTime());
+        m_audioGraph.Start();
     }
 }
 
@@ -180,77 +215,128 @@ void VideoRecordingSession::OnMediaStreamSourceSampleRequested(
     winrt::MediaStreamSourceSampleRequestedEventArgs const& args)
 {
     auto request = args.Request();
-    if (auto frame = m_frameGenerator->TryGetNextFrame())
+    auto streamDescriptor = request.StreamDescriptor();
+    if (auto videoStreamDescriptor = streamDescriptor.try_as<winrt::VideoStreamDescriptor>())
     {
-        try
+        if (auto frame = m_frameGenerator->TryGetNextFrame())
         {
-            auto timeStamp = frame->SystemRelativeTime();
-            auto contentSize = frame->ContentSize();
-            auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->Surface());
-            D3D11_TEXTURE2D_DESC desc = {};
-            frameTexture->GetDesc(&desc);
+            try
+            {
+                auto timeStamp = frame->SystemRelativeTime();
+                auto contentSize = frame->ContentSize();
+                auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame->Surface());
+                D3D11_TEXTURE2D_DESC desc = {};
+                frameTexture->GetDesc(&desc);
 
-            // TODO: Update preview
-            winrt::com_ptr<ID3D11Texture2D> backBuffer;
-            winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
+                // TODO: Update preview
+                winrt::com_ptr<ID3D11Texture2D> backBuffer;
+                winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
 
-            // In order to support window resizing, we need to only copy out the part of
-            // the buffer that contains the window. If the window is smaller than the buffer,
-            // then it's a straight forward copy using the ContentSize. If the window is larger,
-            // we need to clamp to the size of the buffer. For simplicity, we always clamp.
-            auto width = std::clamp(contentSize.Width, 0, static_cast<int32_t>(desc.Width));
-            auto height = std::clamp(contentSize.Height, 0, static_cast<int32_t>(desc.Height));
+                // In order to support window resizing, we need to only copy out the part of
+                // the buffer that contains the window. If the window is smaller than the buffer,
+                // then it's a straight forward copy using the ContentSize. If the window is larger,
+                // we need to clamp to the size of the buffer. For simplicity, we always clamp.
+                auto width = std::clamp(contentSize.Width, 0, static_cast<int32_t>(desc.Width));
+                auto height = std::clamp(contentSize.Height, 0, static_cast<int32_t>(desc.Height));
 
-            D3D11_BOX region = {};
-            region.left = 0;
-            region.right = width;
-            region.top = 0;
-            region.bottom = height;
-            region.back = 1;
+                D3D11_BOX region = {};
+                region.left = 0;
+                region.right = width;
+                region.top = 0;
+                region.bottom = height;
+                region.back = 1;
 
-            m_d3dContext->ClearRenderTargetView(m_renderTargetView.get(), CLEARCOLOR);
-            m_d3dContext->CopySubresourceRegion(
-                backBuffer.get(),
-                0,
-                0, 0, 0,
-                frameTexture.get(),
-                0,
-                &region);
+                m_d3dContext->ClearRenderTargetView(m_renderTargetView.get(), CLEARCOLOR);
+                m_d3dContext->CopySubresourceRegion(
+                    backBuffer.get(),
+                    0,
+                    0, 0, 0,
+                    frameTexture.get(),
+                    0,
+                    &region);
 
-            // CopyResource can fail if our new texture isn't the same size as the back buffer
-            // TODO: Fix how resolutions are handled
-            desc = {};
-            backBuffer->GetDesc(&desc);
+                // CopyResource can fail if our new texture isn't the same size as the back buffer
+                // TODO: Fix how resolutions are handled
+                desc = {};
+                backBuffer->GetDesc(&desc);
 
-            desc.Usage = D3D11_USAGE_DEFAULT;
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-            desc.CPUAccessFlags = 0;
-            desc.MiscFlags = 0;
-            winrt::com_ptr<ID3D11Texture2D> sampleTexture;
-            winrt::check_hresult(m_d3dDevice->CreateTexture2D(&desc, nullptr, sampleTexture.put()));
-            m_d3dContext->CopyResource(sampleTexture.get(), backBuffer.get());
-            auto dxgiSurface = sampleTexture.as<IDXGISurface>();
-            auto sampleSurface = CreateDirect3DSurface(dxgiSurface.get());
+                desc.Usage = D3D11_USAGE_DEFAULT;
+                desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+                desc.CPUAccessFlags = 0;
+                desc.MiscFlags = 0;
+                winrt::com_ptr<ID3D11Texture2D> sampleTexture;
+                winrt::check_hresult(m_d3dDevice->CreateTexture2D(&desc, nullptr, sampleTexture.put()));
+                m_d3dContext->CopyResource(sampleTexture.get(), backBuffer.get());
+                auto dxgiSurface = sampleTexture.as<IDXGISurface>();
+                auto sampleSurface = CreateDirect3DSurface(dxgiSurface.get());
 
-            DXGI_PRESENT_PARAMETERS presentParameters{};
-            winrt::check_hresult(m_previewSwapChain->Present1(0, 0, &presentParameters));
+                DXGI_PRESENT_PARAMETERS presentParameters{};
+                winrt::check_hresult(m_previewSwapChain->Present1(0, 0, &presentParameters));
 
-            auto sample = winrt::MediaStreamSample::CreateFromDirect3D11Surface(sampleSurface, timeStamp);
-            request.Sample(sample);
+                auto sample = winrt::MediaStreamSample::CreateFromDirect3D11Surface(sampleSurface, timeStamp);
+                request.Sample(sample);
+            }
+            catch (winrt::hresult_error const& error)
+            {
+                OutputDebugStringW(error.message().c_str());
+                request.Sample(nullptr);
+                CloseInternal();
+                return;
+            }
         }
-        catch (winrt::hresult_error const& error)
+        else
         {
-            OutputDebugStringW(error.message().c_str());
+            m_ended = true;
             request.Sample(nullptr);
             CloseInternal();
-            return;
+        }
+    }
+    else if (auto audioStreamDescriptor = streamDescriptor.try_as<winrt::AudioStreamDescriptor>())
+    {
+        // TODO: This locking mechanism makes for a choppy video
+        if (!m_ended)
+        {
+            m_audioEvent.wait();
+            winrt::MediaStreamSample sample{ nullptr };
+            {
+                auto lock = m_audioLock.lock_exclusive();
+                sample = m_audioSamples.front();
+                m_audioSamples.pop_front();
+            }
+            request.Sample(sample);
+        }
+        else if (!m_audioSamples.empty())
+        {
+            auto sample = m_audioSamples.front();
+            m_audioSamples.pop_front();
+            request.Sample(sample);
+        }
+        else
+        {
+            request.Sample(nullptr);
         }
     }
     else
     {
-        request.Sample(nullptr);
-        CloseInternal();
+        throw winrt::hresult_error(E_UNEXPECTED);
     }
+}
+
+void VideoRecordingSession::OnAudioQuantumStarted(winrt::AudioGraph const& sender, winrt::IInspectable const&)
+{
+    {
+        auto lock = m_audioLock.lock_exclusive();
+
+        auto frame = m_audioOutputNode.GetFrame();
+        std::optional<winrt::TimeSpan> timestamp = frame.RelativeTime();
+        auto audioBuffer = frame.LockBuffer(winrt::AudioBufferAccessMode::Read);
+        
+        auto sampleBuffer = winrt::Buffer::CreateCopyFromMemoryBuffer(audioBuffer);
+        sampleBuffer.Length(audioBuffer.Length());
+        auto sample = winrt::MediaStreamSample::CreateFromBuffer(sampleBuffer, timestamp.value());
+        m_audioSamples.push_back(sample);
+    }
+    m_audioEvent.SetEvent();
 }
 
 winrt::ICompositionSurface VideoRecordingSession::CreatePreviewSurface(winrt::Compositor const& compositor)

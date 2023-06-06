@@ -20,7 +20,10 @@
 #include <winrt/Windows.Graphics.DirectX.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3d11.h>
 #include <winrt/Windows.Media.h>
+#include <winrt/Windows.Media.Audio.h>
+#include <winrt/Windows.Media.Capture.h>
 #include <winrt/Windows.Media.Core.h>
+#include <winrt/Windows.Media.Render.h>
 #include <winrt/Windows.Media.Transcoding.h>
 #include <winrt/Windows.Media.MediaProperties.h>
 #include <winrt/Windows.Storage.h>
