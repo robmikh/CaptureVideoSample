@@ -21,6 +21,10 @@ namespace winrt::CaptureVideoSample::implementation
 {
     AudioLoopbackInputNode::AudioLoopbackInputNode(winrt::AudioGraph const& graph, winrt::AudioEncodingProperties const& encodingProperties)
     {
+        if (encodingProperties.Subtype() != L"PCM")
+        {
+            throw winrt::hresult_error(E_INVALIDARG, L"Uncompressed audio only.");
+        }
         m_node = graph.CreateFrameInputNode(encodingProperties);
         m_sampleRate = encodingProperties.SampleRate();
 
