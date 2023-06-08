@@ -12,6 +12,7 @@
     <ClCompile Include="VideoRecordingSession.cpp" />
     <ClCompile Include="CaptureFrameGenerator.cpp" />
     <ClCompile Include="AudioSampleGenerator.cpp" />
+    <ClCompile Include="AudioLoopbackInputNode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -20,5 +21,10 @@
     <ClInclude Include="VideoRecordingSession.h" />
     <ClInclude Include="CaptureFrameGenerator.h" />
     <ClInclude Include="AudioSampleGenerator.h" />
+    <ClInclude Include="AudioLoopbackInputNode.h" />
+    <ClInclude Include="MediaAsyncCallback.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="CaptureVideoSample.idl" />
   </ItemGroup>
 </Project>

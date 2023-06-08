@@ -30,6 +30,10 @@
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Storage.Pickers.h>
 
+#include <winrt/CaptureVideoSample.h>
+#include <memorybuffer.h>
+#include <robuffer.h>
+
 // WIL
 #include <wil/resource.h>
 
@@ -38,6 +42,14 @@
 #include <dxgi1_6.h>
 #include <d2d1_3.h>
 #include <wincodec.h>
+
+// Audio
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <audioclientactivationparams.h>
+
+// Media Foundation
+#include <mfapi.h>
 
 // STL
 #include <vector>
@@ -65,3 +77,6 @@
 #include <robmikh.common/hwnd.interop.h>
 #include <robmikh.common/capture.desktop.interop.h>
 #include <robmikh.common/DesktopWindow.h>
+
+// Helpers
+#include "MediaAsyncCallback.h"

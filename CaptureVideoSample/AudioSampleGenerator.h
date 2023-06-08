@@ -36,7 +36,7 @@ private:
 
 private:
     winrt::Windows::Media::Audio::AudioGraph m_audioGraph{ nullptr };
-    winrt::Windows::Media::Audio::AudioDeviceInputNode m_audioInputNode{ nullptr };
+    winrt::Windows::Media::Audio::AudioDeviceInputNode m_microphoneNode{ nullptr };
     winrt::Windows::Media::Audio::AudioFrameOutputNode m_audioOutputNode{ nullptr };
     wil::srwlock m_lock;
     wil::unique_event m_audioEvent;
@@ -44,4 +44,7 @@ private:
     std::deque<winrt::Windows::Media::Core::MediaStreamSample> m_samples;
     std::atomic<bool> m_initialized = false;
     std::atomic<bool> m_started = false;
+
+    winrt::CaptureVideoSample::AudioLoopbackInputNode m_loopbackNode{ nullptr };
+    winrt::Windows::Media::Audio::AudioSubmixNode m_submixNode{ nullptr };
 };

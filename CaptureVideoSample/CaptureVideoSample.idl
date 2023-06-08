@@ -1,0 +1,12 @@
+namespace CaptureVideoSample
+{
+    runtimeclass AudioLoopbackInputNode : Windows.Foundation.IClosable
+    {
+        static Windows.Foundation.IAsyncOperation<AudioLoopbackInputNode> CreateLoopbackNodeIncludingProcessAsync(Windows.Media.Audio.AudioGraph graph, UInt32 processId, Windows.Media.MediaProperties.AudioEncodingProperties encodingProperties);
+        static Windows.Foundation.IAsyncOperation<AudioLoopbackInputNode> CreateLoopbackNodeExcludingProcessAsync(Windows.Media.Audio.AudioGraph graph, UInt32 processId, Windows.Media.MediaProperties.AudioEncodingProperties encodingProperties);
+
+        Windows.Media.Audio.AudioFrameInputNode AudioGraphNode { get; };
+
+        void StartCapture();
+    }
+}
