@@ -138,6 +138,8 @@ void MainWindow::CreateControls(HINSTANCE instance)
     m_fpsComboBox = controls.CreateControl(util::ControlType::ComboBox, L"");
     m_topMostCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Make this window top-most");
     m_excludeCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Exclude this window");
+    m_microphoneCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Record microphone");
+    m_systemAudioCheckBox = controls.CreateControl(util::ControlType::CheckBox, L"Record system audio");
     if (!isWin32CaptureExcludePresent)
     {
         EnableWindow(m_excludeCheckBox, false);
@@ -183,10 +185,12 @@ winrt::fire_and_forget MainWindow::StartRecording()
         auto resolution = GetResolution(item);
         auto bitRate = GetBitRate();
         auto frameRate = GetFrameRate();
+        auto recordMicrophone = GetRecordMicrophone();
+        auto recordSystemAudio = GetRecordSystemAudio();
 
         OnRecordingStarted();
 
-        auto file = co_await m_app->StartRecordingAsync(item, resolution, bitRate, frameRate);
+        auto file = co_await m_app->StartRecordingAsync(item, resolution, bitRate, frameRate, recordMicrophone, recordSystemAudio);
 
         auto filePicker = winrt::FileSavePicker();
         InitializeObjectWithWindowHandle(filePicker);
@@ -216,6 +220,8 @@ void MainWindow::OnRecordingStarted()
     EnableWindow(m_resolutionComboBox, false);
     EnableWindow(m_bitRateComboBox, false);
     EnableWindow(m_fpsComboBox, false);
+    EnableWindow(m_microphoneCheckBox, false);
+    EnableWindow(m_systemAudioCheckBox, false);
     m_state = ApplicationState::Recording;
 }
 
@@ -225,6 +231,8 @@ void MainWindow::OnRecordingFinished()
     EnableWindow(m_resolutionComboBox, true);
     EnableWindow(m_bitRateComboBox, true);
     EnableWindow(m_fpsComboBox, true);
+    EnableWindow(m_microphoneCheckBox, true);
+    EnableWindow(m_systemAudioCheckBox, true);
     m_state = ApplicationState::Idle;
 }
 
@@ -254,6 +262,18 @@ uint32_t MainWindow::GetFrameRate()
     auto index = GetIndexFromComboBox(m_fpsComboBox);
     auto& entry = m_frameRates[index];
     return entry.FrameRate;
+}
+
+bool MainWindow::GetRecordMicrophone()
+{
+    auto value = SendMessageW(m_microphoneCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    return value;
+}
+
+bool MainWindow::GetRecordSystemAudio()
+{
+    auto value = SendMessageW(m_systemAudioCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    return value;
 }
 
 void MainWindow::StopRecording()

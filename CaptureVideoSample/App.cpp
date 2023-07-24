@@ -52,7 +52,9 @@ winrt::IAsyncOperation<winrt::StorageFile> App::StartRecordingAsync(
     winrt::GraphicsCaptureItem const& item,
     winrt::SizeInt32 const& resolution,
     uint32_t bitRate,
-    uint32_t frameRate)
+    uint32_t frameRate,
+    bool recordMicrophone,
+    bool recordSystemAudio)
 {
     auto tempFolderPath = std::filesystem::temp_directory_path().wstring();
     OutputDebugStringW(tempFolderPath.c_str());
@@ -68,6 +70,8 @@ winrt::IAsyncOperation<winrt::StorageFile> App::StartRecordingAsync(
             resolution,
             bitRate,
             frameRate, 
+            recordMicrophone,
+            recordSystemAudio,
             stream);
 
         auto surface = m_recordingSession->CreatePreviewSurface(m_compositor);

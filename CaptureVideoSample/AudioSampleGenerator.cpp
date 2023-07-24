@@ -15,10 +15,14 @@ namespace winrt
     using namespace CaptureVideoSample;
 }
 
-AudioSampleGenerator::AudioSampleGenerator()
+AudioSampleGenerator::AudioSampleGenerator(
+    bool recordMicrophone,
+    bool recordSystemAudio)
 {
     m_audioEvent.create(wil::EventOptions::ManualReset);
     m_endEvent.create(wil::EventOptions::ManualReset);
+    m_recordMicrophone = recordMicrophone;
+    m_recordSystemAudio = recordSystemAudio;
 }
 
 AudioSampleGenerator::~AudioSampleGenerator()
@@ -29,6 +33,8 @@ AudioSampleGenerator::~AudioSampleGenerator()
 
 winrt::IAsyncAction AudioSampleGenerator::InitializeAsync()
 {
+    auto gainValue = (m_recordSystemAudio != m_recordSystemAudio) ? 1.0 : 0.5;
+
     auto expected = false;
     if (m_initialized.compare_exchange_strong(expected, true))
     {
@@ -42,23 +48,43 @@ winrt::IAsyncAction AudioSampleGenerator::InitializeAsync()
         m_audioGraph = audioGraphResult.Graph();
 
         // Initialize audio input and output nodes
-        auto inputNodeResult = co_await m_audioGraph.CreateDeviceInputNodeAsync(winrt::MediaCategory::Media);
-        if (inputNodeResult.Status() != winrt::AudioDeviceNodeCreationStatus::Success)
+        if (m_recordMicrophone)
         {
-            throw winrt::hresult_error(E_FAIL, L"Failed to initialize input audio node!");
+            auto inputNodeResult = co_await m_audioGraph.CreateDeviceInputNodeAsync(winrt::MediaCategory::Media);
+            if (inputNodeResult.Status() != winrt::AudioDeviceNodeCreationStatus::Success)
+            {
+                throw winrt::hresult_error(E_FAIL, L"Failed to initialize input audio node!");
+            }
+            m_microphoneNode = inputNodeResult.DeviceInputNode();
         }
-        m_microphoneNode = inputNodeResult.DeviceInputNode();
 
-        m_loopbackNode = co_await winrt::AudioLoopbackInputNode::CreateLoopbackNodeExcludingProcessAsync(m_audioGraph, GetCurrentProcessId(), winrt::AudioEncodingProperties::CreatePcm(44100, 2, 16));
+        if (m_recordSystemAudio)
+        {
+            m_loopbackNode = co_await winrt::AudioLoopbackInputNode::CreateLoopbackNodeExcludingProcessAsync(m_audioGraph, GetCurrentProcessId(), winrt::AudioEncodingProperties::CreatePcm(44100, 2, 16));
+        }
 
-        m_submixNode = m_audioGraph.CreateSubmixNode();
+        if (m_recordMicrophone && m_recordSystemAudio)
+        {
+            m_submixNode = m_audioGraph.CreateSubmixNode();
+        }
 
         m_audioOutputNode = m_audioGraph.CreateFrameOutputNode();
 
         // Hookup audio nodes
-        m_microphoneNode.AddOutgoingConnection(m_submixNode, 0.5);
-        m_loopbackNode.AudioGraphNode().AddOutgoingConnection(m_submixNode, 0.5);
-        m_submixNode.AddOutgoingConnection(m_audioOutputNode);
+        if (m_recordMicrophone && m_recordSystemAudio)
+        {
+            m_microphoneNode.AddOutgoingConnection(m_submixNode, 0.5);
+            m_loopbackNode.AudioGraphNode().AddOutgoingConnection(m_submixNode, 0.5);
+            m_submixNode.AddOutgoingConnection(m_audioOutputNode);
+        }
+        else if (m_recordMicrophone)
+        {
+            m_microphoneNode.AddOutgoingConnection(m_audioOutputNode);
+        }
+        else if (m_recordSystemAudio)
+        {
+            m_loopbackNode.AudioGraphNode().AddOutgoingConnection(m_audioOutputNode);
+        }
         m_audioGraph.QuantumStarted({ this, &AudioSampleGenerator::OnAudioQuantumStarted });
     }
 }
@@ -122,7 +148,10 @@ void AudioSampleGenerator::Start()
     if (m_started.compare_exchange_strong(expected, true))
     {
         m_audioGraph.Start();
-        m_loopbackNode.StartCapture();
+        if (m_loopbackNode)
+        {
+            m_loopbackNode.StartCapture();
+        }
     }
 }
 
@@ -132,7 +161,10 @@ void AudioSampleGenerator::Stop()
     if (m_started.load())
     {
         m_audioGraph.Stop();
-        m_loopbackNode.Close();
+        if (m_loopbackNode)
+        {
+            m_loopbackNode.Close();
+        }
         m_endEvent.SetEvent();
     }
 }

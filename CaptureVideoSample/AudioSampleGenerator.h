@@ -3,7 +3,9 @@
 class AudioSampleGenerator
 {
 public:
-    AudioSampleGenerator();
+    AudioSampleGenerator(
+        bool recordMicrophone,
+        bool recordSystemAudio);
     ~AudioSampleGenerator();
 
     winrt::Windows::Foundation::IAsyncAction InitializeAsync();
@@ -44,6 +46,8 @@ private:
     wil::unique_event m_audioEvent;
     wil::unique_event m_endEvent;
     std::deque<winrt::Windows::Media::Core::MediaStreamSample> m_samples;
+    bool m_recordMicrophone = false;
+    bool m_recordSystemAudio = false;
     std::atomic<bool> m_initialized = false;
     std::atomic<bool> m_started = false;
 };

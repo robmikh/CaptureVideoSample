@@ -11,6 +11,8 @@ public:
         winrt::Windows::Graphics::SizeInt32 const& resolution,
         uint32_t bitRate,
         uint32_t frameRate,
+        bool recordMicrophone,
+        bool recordSystemAudio,
         winrt::Windows::Storage::Streams::IRandomAccessStream const& stream);
     ~VideoRecordingSession();
 
@@ -25,6 +27,8 @@ private:
         winrt::Windows::Graphics::SizeInt32 const& resolution,
         uint32_t bitRate,
         uint32_t frameRate,
+        bool recordMicrophone,
+        bool recordSystemAudio,
         winrt::Windows::Storage::Streams::IRandomAccessStream const& stream);
     void CloseInternal();
 

@@ -12,7 +12,9 @@ public:
         winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& item,
         winrt::Windows::Graphics::SizeInt32 const& resolution,
         uint32_t bitRate,
-        uint32_t frameRate);
+        uint32_t frameRate,
+        bool recordMicrophone,
+        bool recordSystemAudio);
     void StopRecording();
 
 private:

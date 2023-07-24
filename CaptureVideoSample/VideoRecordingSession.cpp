@@ -45,12 +45,15 @@ VideoRecordingSession::VideoRecordingSession(
     winrt::GraphicsCaptureItem const& item, 
     winrt::SizeInt32 const& resolution, 
     uint32_t bitRate, 
-    uint32_t frameRate, 
+    uint32_t frameRate,
+    bool recordMicrophone,
+    bool recordSystemAudio,
     winrt::Windows::Storage::Streams::IRandomAccessStream const& stream)
 {
     m_device = device;
     m_d3dDevice = GetDXGIInterfaceFromObject<ID3D11Device>(m_device);
     m_d3dDevice->GetImmediateContext(m_d3dContext.put());
+    bool recordAudio = recordMicrophone || recordSystemAudio;
 
     m_item = item;
     auto itemSize = item.Size();
@@ -84,9 +87,12 @@ VideoRecordingSession::VideoRecordingSession(
     video.PixelAspectRatio().Numerator(1);
     video.PixelAspectRatio().Denominator(1);
     m_encodingProfile.Video(video);
-    auto audio = m_encodingProfile.Audio();
-    audio = winrt::AudioEncodingProperties::CreateAac(44100, 2, 16);
-    m_encodingProfile.Audio(audio);
+    if (recordAudio)
+    {
+        auto audio = m_encodingProfile.Audio();
+        audio = winrt::AudioEncodingProperties::CreateAac(44100, 2, 16);
+        m_encodingProfile.Audio(audio);
+    }
 
     // Describe our input: uncompressed BGRA8 buffers
     auto properties = winrt::VideoEncodingProperties::CreateUncompressed(
@@ -107,7 +113,10 @@ VideoRecordingSession::VideoRecordingSession(
     winrt::check_hresult(m_previewSwapChain->GetBuffer(0, winrt::guid_of<ID3D11Texture2D>(), backBuffer.put_void()));
     winrt::check_hresult(m_d3dDevice->CreateRenderTargetView(backBuffer.get(), nullptr, m_renderTargetView.put()));
 
-    m_audioGenerator = std::make_unique<AudioSampleGenerator>();
+    if (recordAudio)
+    {
+        m_audioGenerator = std::make_unique<AudioSampleGenerator>(recordMicrophone, recordSystemAudio);
+    }
 }
 
 std::shared_ptr<VideoRecordingSession> VideoRecordingSession::Create(
@@ -116,9 +125,11 @@ std::shared_ptr<VideoRecordingSession> VideoRecordingSession::Create(
     winrt::SizeInt32 const& resolution,
     uint32_t bitRate,
     uint32_t frameRate,
+    bool recordMicrophone,
+    bool recordSystemAudio,
     winrt::Windows::Storage::Streams::IRandomAccessStream const& stream)
 {
-    return std::shared_ptr<VideoRecordingSession>(new VideoRecordingSession(device, item, resolution, bitRate, frameRate, stream));
+    return std::shared_ptr<VideoRecordingSession>(new VideoRecordingSession(device, item, resolution, bitRate, frameRate, recordMicrophone, recordSystemAudio, stream));
 }
 
 VideoRecordingSession::~VideoRecordingSession()

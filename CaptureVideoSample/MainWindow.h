@@ -43,6 +43,8 @@ private:
 	winrt::Windows::Graphics::SizeInt32 GetResolution(winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& source);
 	uint32_t GetBitRate();
 	uint32_t GetFrameRate();
+	bool GetRecordMicrophone();
+	bool GetRecordSystemAudio();
 	void StopRecording();
 
 private:
@@ -54,6 +56,8 @@ private:
 	HWND m_fpsComboBox = nullptr;
 	HWND m_topMostCheckBox = nullptr;
 	HWND m_excludeCheckBox = nullptr;
+	HWND m_microphoneCheckBox = nullptr;
+	HWND m_systemAudioCheckBox = nullptr;
 	std::vector<ResolutionEntry> m_resolutions;
 	std::vector<BitRateEntry> m_bitRates;
 	std::vector<FrameRateEntry> m_frameRates;
