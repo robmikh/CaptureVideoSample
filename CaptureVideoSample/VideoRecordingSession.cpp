@@ -142,10 +142,20 @@ winrt::IAsyncAction VideoRecordingSession::StartAsync()
     auto expected = false;
     if (m_isRecording.compare_exchange_strong(expected, true))
     {
-        co_await m_audioGenerator->InitializeAsync();
+        if (m_audioGenerator)
+        {
+            co_await m_audioGenerator->InitializeAsync();
+        }
 
         // Create our MediaStreamSource
-        m_streamSource = winrt::MediaStreamSource(m_videoDescriptor, winrt::AudioStreamDescriptor(m_audioGenerator->GetEncodingProperties()));
+        if (m_audioGenerator)
+        {
+            m_streamSource = winrt::MediaStreamSource(m_videoDescriptor, winrt::AudioStreamDescriptor(m_audioGenerator->GetEncodingProperties()));
+        }
+        else
+        {
+            m_streamSource = winrt::MediaStreamSource(m_videoDescriptor);
+        }
         m_streamSource.BufferTime(std::chrono::seconds(0));
         m_streamSource.Starting({ this, &VideoRecordingSession::OnMediaStreamSourceStarting });
         m_streamSource.SampleRequested({ this, &VideoRecordingSession::OnMediaStreamSourceSampleRequested });
@@ -183,7 +193,10 @@ void VideoRecordingSession::Close()
 
 void VideoRecordingSession::CloseInternal()
 {
-    m_audioGenerator->Stop();
+    if (m_audioGenerator)
+    {
+        m_audioGenerator->Stop();
+    }
     m_frameGenerator->StopCapture();
     m_itemClosed.revoke();
 }
@@ -196,7 +209,10 @@ void VideoRecordingSession::OnMediaStreamSourceStarting(
     if (auto frame = m_frameGenerator->TryGetNextFrame())
     {
         args.Request().SetActualStartPosition(frame->SystemRelativeTime());
-        m_audioGenerator->Start();
+        if (m_audioGenerator)
+        {
+            m_audioGenerator->Start();
+        }
     }
 }
 
